@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const WidgetContext = createContext();
+const TABS = ['learn', 'quiz', 'hashtags'];
 
 export const useWidget = () => {
   const context = useContext(WidgetContext);
@@ -12,13 +13,22 @@ export const useWidget = () => {
 
 export const WidgetProvider = ({ children }) => {
   const [widgetSettings, setWidgetSettings] = useState(() => {
-    const saved = localStorage.getItem('widgetSettings');
-    return saved ? JSON.parse(saved) : {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem('widgetSettings'));
+    } catch {
+      saved = null;
+    }
+    if (saved) {
+      // Tabs from the old OpenAI widget ('chat', 'image') no longer exist.
+      return TABS.includes(saved.activeTab) ? saved : { ...saved, activeTab: 'learn' };
+    }
+    return {
       position: 'right', // 'left' or 'right'
       isMinimized: true, // Keep minimized by default
       isMaximized: false, // New maximized state
       isVisible: true,
-      activeTab: 'chat', // 'chat', 'image', 'hashtags'
+      activeTab: 'learn', // 'learn', 'quiz', 'hashtags'
       hasAutoOpened: false, // Track if auto-open has occurred
       lastInteraction: Date.now() // Track last user interaction
     };
@@ -42,22 +52,30 @@ export const WidgetProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('widgetSettings', JSON.stringify(widgetSettings));
+    try {
+      localStorage.setItem('widgetSettings', JSON.stringify(widgetSettings));
+    } catch {
+      // Storage can be unavailable (private mode); settings just won't persist.
+    }
   }, [widgetSettings]);
 
   const updateWidgetSettings = (newSettings) => {
     setWidgetSettings(prev => ({ ...prev, ...newSettings }));
   };
 
+  // Sidebar button: open the panel (on the Learn tab), or minimize it if it is already open.
   const toggleWidget = () => {
-    setWidgetSettings(prev => ({ 
-      ...prev, 
-      isVisible: !prev.isVisible,
-      // When opening from sidebar, ensure it opens in chat mode and not minimized
-      isMinimized: prev.isVisible ? true : false,
-      activeTab: prev.isVisible ? prev.activeTab : 'chat',
-      lastInteraction: Date.now()
-    }));
+    setWidgetSettings(prev => {
+      const isOpen = prev.isVisible && !prev.isMinimized;
+      return {
+        ...prev,
+        isVisible: true,
+        isMinimized: isOpen,
+        isMaximized: false,
+        activeTab: isOpen ? prev.activeTab : 'learn',
+        lastInteraction: Date.now()
+      };
+    });
   };
 
   const minimizeWidget = () => {

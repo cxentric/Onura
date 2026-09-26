@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Icon from '../AppIcon';
 import { useTheme } from '../../contexts/ThemeContext';
-import { generateHashtags, generateContentIdeas } from '../../services/openaiService';
+import { generateHashtags, generateContentIdeas } from '../../services/knowledgeBase';
 
 const HashtagGenerator = ({ setIsLoading }) => {
   const { theme } = useTheme();

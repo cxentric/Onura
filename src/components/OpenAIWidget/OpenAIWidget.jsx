@@ -1,25 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../AppIcon';
 import { useWidget } from '../../contexts/WidgetContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import ChatInterface from './ChatInterface';
-import ImageGenerator from './ImageGenerator';
+import LearnPanel from './LearnPanel';
+import QuizPanel from './QuizPanel';
 import HashtagGenerator from './HashtagGenerator';
 
 const OpenAIWidget = () => {
-  const { widgetSettings, minimizeWidget, maximizeWidget, closeWidget, setActiveTab, toggleWidget } = useWidget();
+  const { widgetSettings, minimizeWidget, maximizeWidget, closeWidget, setActiveTab } = useWidget();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
 
   const { position, isMinimized, isMaximized, isVisible, activeTab } = widgetSettings;
-
-  // Ensure widget opens in chat mode when clicked from sidebar
-  useEffect(() => {
-    if (isVisible && !isMinimized && activeTab !== 'chat') {
-      setActiveTab('chat');
-    }
-  }, [isVisible, isMinimized, activeTab, setActiveTab]);
 
   if (!isVisible) return null;
 
@@ -27,25 +20,25 @@ const OpenAIWidget = () => {
   const positionClasses = position === 'left' ? 'left-4 bottom-4' : 'right-4 bottom-4';
   // Updated mobile positioning to ensure proper spacing from bottom navigation (64px + 16px padding)
   const mobilePositionClasses = position === 'left' ? 'left-4 bottom-20' : 'right-4 bottom-20';
-  const maximizedClasses = isMaximized ? 'inset-4' : `${positionClasses} lg:${positionClasses}`;
-  const responsiveClasses = isMaximized ? 'inset-4' : `${mobilePositionClasses} lg:${positionClasses}`;
+  // Maximized: fill the screen below the fixed 64px header and above the mobile bottom nav.
+  const responsiveClasses = isMaximized
+    ? 'left-4 right-4 top-20 bottom-20 lg:bottom-4'
+    : `${mobilePositionClasses} lg:${positionClasses}`;
 
   const tabs = [
-    { id: 'chat', label: 'Chat', icon: 'MessageCircle' },
-    { id: 'image', label: 'Image', icon: 'Image' },
+    { id: 'learn', label: 'Learn', icon: 'BookOpen' },
+    { id: 'quiz', label: 'Quiz', icon: 'ListChecks' },
     { id: 'hashtags', label: 'Tags', icon: 'Hash' }
   ];
 
   const renderActiveTab = () => {
     switch (activeTab) {
-      case 'chat':
-        return <ChatInterface setIsLoading={setIsLoading} />;
-      case 'image':
-        return <ImageGenerator setIsLoading={setIsLoading} />;
+      case 'quiz':
+        return <QuizPanel />;
       case 'hashtags':
         return <HashtagGenerator setIsLoading={setIsLoading} />;
       default:
-        return <ChatInterface setIsLoading={setIsLoading} />;
+        return <LearnPanel />;
     }
   };
 
@@ -69,7 +62,7 @@ const OpenAIWidget = () => {
               }`}>
                 <img 
                   src="/assets/images/cxentric-1751651737342.png" 
-                  alt="AI Assistant" 
+                  alt="Career Assistant" 
                   className="w-8 h-8 rounded-full object-cover"
                 />
               </div>
@@ -89,7 +82,7 @@ const OpenAIWidget = () => {
             exit={{ scale: 0, opacity: 0 }}
             className={`${
               isMaximized ? 'w-full h-full' : 'w-80 h-96'
-            } rounded-lg shadow-xl border overflow-hidden ${
+            } flex flex-col rounded-lg shadow-xl border overflow-hidden ${
               theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'
             }`}
           >
@@ -105,7 +98,7 @@ const OpenAIWidget = () => {
                   }`}>
                     <img 
                       src="/assets/images/cxentric-1751651737342.png" 
-                      alt="AI Assistant" 
+                      alt="Career Assistant" 
                       className="w-4 h-4 rounded-full object-cover"
                     />
                   </div>
@@ -113,7 +106,7 @@ const OpenAIWidget = () => {
                 <span className={`text-sm font-medium ${
                   theme === 'dark' ? 'text-white' : 'text-gray-800'
                 }`}>
-                  AI Assistant
+                  Career Assistant
                 </span>
               </div>
               <div className="flex items-center space-x-1">
@@ -168,7 +161,7 @@ const OpenAIWidget = () => {
             </div>
 
             {/* Content Area */}
-            <div className="h-full overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               {renderActiveTab()}
             </div>
           </motion.div>

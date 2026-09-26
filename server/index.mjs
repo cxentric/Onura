@@ -1,12 +1,10 @@
-// Production server: serves the built app from ./build and the /api routes.
+// Production server: serves the built app from ./build with client-side routing.
 // Usage: npm run build && npm run serve
-import 'dotenv/config';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { apiMiddleware } from './api.mjs';
 
 const BUILD_DIR = resolve(fileURLToPath(new URL('../build', import.meta.url)));
 const PORT = Number(process.env.PORT) || 3000;
@@ -45,14 +43,11 @@ async function serveStatic(req, res) {
 }
 
 createServer((req, res) => {
-  apiMiddleware(req, res, () => {
-    serveStatic(req, res).catch(error => {
-      console.error(error);
-      res.statusCode = 500;
-      res.end('Internal server error');
-    });
+  serveStatic(req, res).catch(error => {
+    console.error(error);
+    res.statusCode = 500;
+    res.end('Internal server error');
   });
 }).listen(PORT, () => {
   console.log(`CXentric running at http://localhost:${PORT}`);
-  if (!process.env.OPENAI_API_KEY) console.warn('Warning: OPENAI_API_KEY is not set; AI features will fail.');
 });

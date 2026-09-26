@@ -26,28 +26,34 @@ A modern React-based project utilizing the latest frontend technologies and tool
    ```bash
    npm install
    ```
-2. Create your environment file and add your keys:
+2. (Optional) Create your environment file if you use any of the integrations listed in it:
 
    ```bash
    cp .env.example .env
    ```
-   `OPENAI_API_KEY` is read **only by the server** and is never sent to the browser.
-   Only variables prefixed with `VITE_` are bundled into client code, so never put secrets in a `VITE_` variable.
-3. Start the development server (the app and the `/api` routes run together):
+   Only variables prefixed with `VITE_` are bundled into client code, and anyone can read them — never put secrets there.
+3. Start the development server:
 
    ```bash
    npm start
    ```
 
-## 🤖 AI API
+## 🎓 Career Assistant (knowledge base)
 
-All OpenAI calls go through the server in `server/`:
+The assistant widget works fully offline — no API keys. It is driven by a predefined knowledge base of
+**1000 questions and answers** in `src/data/kb/`:
 
-* `server/openai.mjs` — OpenAI client and prompts
-* `server/api.mjs` — `/api/ai/*` routes with input limits and a per-IP rate limit (`AI_RATE_LIMIT_PER_MINUTE`, default 20)
-* `server/index.mjs` — production server that serves `build/` plus the API
+* `industries.js` — IT, BPO, Medicine, Engineering, AI and Teaching: 10 leading companies each, industry facts, and role details per industry
+* `roles.js` — CXM, Presales, Developer, QE, Designer, Project Manager, Business Analyst, Data Analyst, Sales and HR profiles
+* `index.js` — builds the 1000 Q&As (240 company, 660 role × industry, 60 industry, 40 career) and the quiz options
 
-The browser uses `src/services/openaiService.js`, which calls these routes.
+Widget tabs:
+
+* **Learn** — filter by industry, topic and role, pick a predefined question, and read the answer
+* **Quiz** — 5/10/20 multiple-choice questions with instant feedback and a score
+* **Tags** — hashtag and content-idea suggestions from the same data (`src/services/knowledgeBase.js`)
+
+To add or change questions, edit the data files; the question count and quiz options update automatically.
 
 ## 📁 Project Structure
 
@@ -58,12 +64,12 @@ react_app/
 │   ├── components/     # Reusable UI components
 │   ├── pages/          # Page components
 │   ├── styles/         # Global styles and Tailwind configuration
-│   ├── services/       # Client API wrappers
+│   ├── data/kb/        # Career knowledge base (1000 Q&As)
+│   ├── services/       # Knowledge-base helpers (hashtags, content ideas)
 │   ├── App.jsx         # Main application component
 │   ├── Routes.jsx      # Application routes
 │   └── index.jsx       # Application entry point
-├── api/                # Vercel serverless functions (/api/ai/*)
-├── server/             # API logic, OpenAI calls, standalone production server
+├── server/             # Standalone static production server (npm run serve)
 ├── vercel.json         # Vercel build/routing config
 ├── .env.example        # Environment variable template
 ├── index.html          # HTML template
@@ -109,20 +115,19 @@ The app is built with responsive design using Tailwind CSS breakpoints.
 
 ## 📦 Deployment
 
-Build and run the production server (any Node 18+ host):
+Build and serve the static app (any Node 18+ host):
 
 ```bash
 npm run build
 npm run serve
 ```
 
-Set `OPENAI_API_KEY` (and optionally `PORT`) in the host's environment.
+Set `PORT` in the host's environment if needed.
 
 ### Vercel
 
-The repo deploys to Vercel as-is: `vercel.json` sets the `build` output folder and client-side routing,
-and each `/api/ai/*` route is a serverless function in `api/` that reuses `server/api.mjs`.
-Add `OPENAI_API_KEY` under **Project → Settings → Environment Variables**, then redeploy.
+The repo deploys to Vercel as-is: `vercel.json` sets the `build` output folder and client-side routing.
+No environment variables are required.
 
 ## 🙏 Acknowledgments
 

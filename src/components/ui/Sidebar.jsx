@@ -31,11 +31,11 @@ const Sidebar = () => {
 
   const quickActions = [
   {
-    label: 'AI Assistant',
-    icon: 'Bot',
+    label: 'Career Assistant',
+    icon: 'GraduationCap',
     action: () => toggleWidget(),
     badge: widgetSettings.isVisible ? null : 'New',
-    description: 'Get AI-powered help and suggestions',
+    description: 'Career Q&A and quizzes by industry',
     isAI: true
   },
   {
