@@ -9,7 +9,7 @@ const PreviewPanel = () => {
   const mockComponents = [
     {
       type: 'header',
-      content: 'Onura Dashboard',
+      content: 'cxentric Dashboard',
     },
     {
       type: 'card',
@@ -59,7 +59,7 @@ const PreviewPanel = () => {
             <div className={`h-8 rounded mb-4 flex items-center px-3 ${
               theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
             }`} style={{ backgroundColor: currentColors?.primary }}>
-              <div className="text-white text-sm font-medium">Onura</div>
+              <div className="text-white text-sm font-medium">cxentric</div>
             </div>
             
             <div className="space-y-3">
@@ -113,7 +113,7 @@ const PreviewPanel = () => {
             <div className={`h-6 rounded mb-2 flex items-center px-2 ${
               theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
             }`} style={{ backgroundColor: currentColors?.primary }}>
-              <div className="text-white text-xs font-medium">Onura</div>
+              <div className="text-white text-xs font-medium">cxentric</div>
             </div>
             
             <div className="space-y-2">

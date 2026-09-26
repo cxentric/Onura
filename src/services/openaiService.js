@@ -1,5 +1,5 @@
 /**
- * Client for Onura's AI endpoints. All OpenAI calls happen on the server
+ * Client for cxentric's AI endpoints. All OpenAI calls happen on the server
  * (see server/api.mjs) so the API key is never shipped to the browser.
  */
 

@@ -53,6 +53,6 @@ createServer((req, res) => {
     });
   });
 }).listen(PORT, () => {
-  console.log(`Onura running at http://localhost:${PORT}`);
+  console.log(`cxentric running at http://localhost:${PORT}`);
   if (!process.env.OPENAI_API_KEY) console.warn('Warning: OPENAI_API_KEY is not set; AI features will fail.');
 });

@@ -68,7 +68,7 @@ const OpenAIWidget = () => {
                 theme === 'dark' ? 'bg-gray-800' : 'bg-white'
               }`}>
                 <img 
-                  src="/assets/images/Onura-1751651737342.png" 
+                  src="/assets/images/cxentric-1751651737342.png" 
                   alt="AI Assistant" 
                   className="w-8 h-8 rounded-full object-cover"
                 />
@@ -104,7 +104,7 @@ const OpenAIWidget = () => {
                     theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                   }`}>
                     <img 
-                      src="/assets/images/Onura-1751651737342.png" 
+                      src="/assets/images/cxentric-1751651737342.png" 
                       alt="AI Assistant" 
                       className="w-4 h-4 rounded-full object-cover"
                     />

@@ -54,8 +54,8 @@ const Header = () => {
           <div className="flex items-center justify-center h-16">
             <Link to="/" className="flex items-center space-x-2">
               <img 
-                src="/assets/images/Onura-1751655797090.png" 
-                alt="Onura Logo" 
+                src="/assets/images/cxentric-1751655797090.png" 
+                alt="cxentric Logo" 
                 className="w-8 h-8 rounded-full object-cover"
                 onError={(e) => {
                   e.target.style.display = 'none';
@@ -66,7 +66,7 @@ const Header = () => {
                 <Icon name="Network" size={20} color="white" />
               </div>
               <span className="text-xl font-heading font-semibold text-text-primary">
-                Onura
+                cxentric
               </span>
             </Link>
           </div>
@@ -82,8 +82,8 @@ const Header = () => {
           {/* Logo */}
           <Link to="/dashboard-feed" className="flex items-center space-x-2 flex-shrink-0">
             <img 
-              src="/assets/images/Onura-1751655797090.png" 
-              alt="Onura Logo" 
+              src="/assets/images/cxentric-1751655797090.png" 
+              alt="cxentric Logo" 
               className="w-8 h-8 rounded-full object-cover"
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -93,7 +93,7 @@ const Header = () => {
             <div className="w-8 h-8 bg-primary rounded-lg items-center justify-center hidden">
               <Icon name="Network" size={20} color="white" className="block" />
             </div>
-            <span className="hidden sm:block text-xl font-heading font-semibold text-text-primary">Onura
+            <span className="hidden sm:block text-xl font-heading font-semibold text-text-primary">cxentric
             </span>
           </Link>
 

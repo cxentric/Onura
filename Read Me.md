@@ -1,4 +1,4 @@
-# Onura
+# cxentric
 
 A modern React-based project utilizing the latest frontend technologies and tools for building responsive web applications.
 
@@ -62,7 +62,9 @@ react_app/
 │   ├── App.jsx         # Main application component
 │   ├── Routes.jsx      # Application routes
 │   └── index.jsx       # Application entry point
-├── server/             # API server (OpenAI calls, production server)
+├── api/                # Vercel serverless functions (/api/ai/*)
+├── server/             # API logic, OpenAI calls, standalone production server
+├── vercel.json         # Vercel build/routing config
 ├── .env.example        # Environment variable template
 ├── index.html          # HTML template
 ├── package.json        # Project dependencies and scripts
@@ -115,6 +117,12 @@ npm run serve
 ```
 
 Set `OPENAI_API_KEY` (and optionally `PORT`) in the host's environment.
+
+### Vercel
+
+The repo deploys to Vercel as-is: `vercel.json` sets the `build` output folder and client-side routing,
+and each `/api/ai/*` route is a serverless function in `api/` that reuses `server/api.mjs`.
+Add `OPENAI_API_KEY` under **Project → Settings → Environment Variables**, then redeploy.
 
 ## 🙏 Acknowledgments
 

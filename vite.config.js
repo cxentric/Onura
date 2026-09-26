@@ -6,9 +6,9 @@ import { apiMiddleware } from "./server/api.mjs";
 
 // Serves the /api routes (server/api.mjs) from the Vite dev and preview servers,
 // so OPENAI_API_KEY stays server-side in development too.
-function onuraApi() {
+function appApi() {
   return {
-    name: "onura-api",
+    name: "cxentric-api",
     configureServer(server) {
       server.middlewares.use(apiMiddleware);
     },
@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
       outDir: "build",
       chunkSizeWarningLimit: 2000,
     },
-    plugins: [tsconfigPaths(), react(), tagger(), onuraApi()],
+    plugins: [tsconfigPaths(), react(), tagger(), appApi()],
     server: {
       port: "4028",
       host: "0.0.0.0",

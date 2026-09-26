@@ -47,7 +47,7 @@ const ThemeSelector = () => {
         <p className={`text-sm ${
           theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
         }`}>
-          Choose your preferred theme mode for the Onura interface
+          Choose your preferred theme mode for the cxentric interface
         </p>
       </div>
 
