@@ -1,4 +1,4 @@
-# React
+# Onura
 
 A modern React-based project utilizing the latest frontend technologies and tools for building responsive web applications.
 
@@ -25,16 +25,29 @@ A modern React-based project utilizing the latest frontend technologies and tool
 
    ```bash
    npm install
-   # or
-   yarn install
    ```
-2. Start the development server:
+2. Create your environment file and add your keys:
+
+   ```bash
+   cp .env.example .env
+   ```
+   `OPENAI_API_KEY` is read **only by the server** and is never sent to the browser.
+   Only variables prefixed with `VITE_` are bundled into client code, so never put secrets in a `VITE_` variable.
+3. Start the development server (the app and the `/api` routes run together):
 
    ```bash
    npm start
-   # or
-   yarn start
    ```
+
+## 🤖 AI API
+
+All OpenAI calls go through the server in `server/`:
+
+* `server/openai.mjs` — OpenAI client and prompts
+* `server/api.mjs` — `/api/ai/*` routes with input limits and a per-IP rate limit (`AI_RATE_LIMIT_PER_MINUTE`, default 20)
+* `server/index.mjs` — production server that serves `build/` plus the API
+
+The browser uses `src/services/openaiService.js`, which calls these routes.
 
 ## 📁 Project Structure
 
@@ -45,10 +58,12 @@ react_app/
 │   ├── components/     # Reusable UI components
 │   ├── pages/          # Page components
 │   ├── styles/         # Global styles and Tailwind configuration
+│   ├── services/       # Client API wrappers
 │   ├── App.jsx         # Main application component
 │   ├── Routes.jsx      # Application routes
 │   └── index.jsx       # Application entry point
-├── .env                # Environment variables
+├── server/             # API server (OpenAI calls, production server)
+├── .env.example        # Environment variable template
 ├── index.html          # HTML template
 ├── package.json        # Project dependencies and scripts
 ├── tailwind.config.js  # Tailwind CSS configuration
@@ -92,11 +107,14 @@ The app is built with responsive design using Tailwind CSS breakpoints.
 
 ## 📦 Deployment
 
-Build the application for production:
+Build and run the production server (any Node 18+ host):
 
 ```bash
 npm run build
+npm run serve
 ```
+
+Set `OPENAI_API_KEY` (and optionally `PORT`) in the host's environment.
 
 ## 🙏 Acknowledgments
 
