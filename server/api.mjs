@@ -27,6 +27,15 @@ setInterval(() => {
 }, RATE_WINDOW_MS).unref();
 
 function readJson(req) {
+  // Vercel functions expose an already-parsed body; Vite/Node give the raw stream.
+  let preParsed;
+  try {
+    preParsed = req.body; // Vercel's getter throws on malformed JSON
+  } catch {
+    return Promise.reject(Object.assign(new Error('Invalid JSON body.'), { status: 400 }));
+  }
+  if (preParsed !== undefined) return parsedBody(preParsed);
+
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -48,6 +57,19 @@ function readJson(req) {
     });
     req.on('error', reject);
   });
+}
+
+async function parsedBody(body) {
+  const raw = Buffer.isBuffer(body) ? body.toString('utf8') : typeof body === 'string' ? body : JSON.stringify(body ?? {});
+  if (Buffer.byteLength(raw) > MAX_BODY_BYTES) {
+    throw Object.assign(new Error('Request body too large.'), { status: 413 });
+  }
+  if (typeof body === 'object' && body !== null && !Buffer.isBuffer(body)) return body;
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    throw Object.assign(new Error('Invalid JSON body.'), { status: 400 });
+  }
 }
 
 function requireText(value, field) {
