@@ -41,8 +41,8 @@ const ThemeCustomizationSettings = () => {
   return (
     <>
       <Helmet>
-        <title>Theme & Customization - cxentric</title>
-        <meta name="description" content="Customize your cxentric experience with themes, colors, and personalization options" />
+        <title>Theme & Customization - CXentric</title>
+        <meta name="description" content="Customize your CXentric experience with themes, colors, and personalization options" />
       </Helmet>
 
       <div className={`min-h-screen ${
@@ -72,7 +72,7 @@ const ThemeCustomizationSettings = () => {
                   <p className={`text-sm ${
                     theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                   }`}>
-                    Personalize your cxentric experience
+                    Personalize your CXentric experience
                   </p>
                 </div>
               </div>

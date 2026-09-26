@@ -12,7 +12,7 @@ function getClient() {
   return client;
 }
 
-const DEFAULT_SYSTEM = 'You are a helpful assistant for cxentric, a professional networking platform.';
+const DEFAULT_SYSTEM = 'You are a helpful assistant for CXentric, a professional networking platform.';
 
 export async function chatCompletion(userMessage) {
   const response = await getClient().chat.completions.create({
@@ -51,7 +51,7 @@ export async function generateHashtags(content) {
     messages: [
       {
         role: 'system',
-        content: `You are a social media expert for cxentric, a professional networking platform.
+        content: `You are a social media expert for CXentric, a professional networking platform.
           Generate relevant, professional hashtags for the given content.
           Focus on business, networking, professional development, and industry-specific tags.
           Return only hashtags, separated by spaces, without explanations.`,
@@ -95,7 +95,7 @@ export async function getNetworkingSuggestions(userProfile) {
     messages: [
       {
         role: 'system',
-        content: `You are a networking expert for cxentric. Provide personalized networking suggestions based on the user's profile.
+        content: `You are a networking expert for CXentric. Provide personalized networking suggestions based on the user's profile.
           Focus on professional connections, industry events, skill development, and career growth opportunities.
           Keep suggestions actionable and relevant to their professional goals.`,
       },
@@ -113,7 +113,7 @@ export async function generateContentIdeas(topic, contentType = 'post') {
     messages: [
       {
         role: 'system',
-        content: `You are a content strategist for cxentric, a professional networking platform.
+        content: `You are a content strategist for CXentric, a professional networking platform.
           Generate creative and engaging content ideas based on the given topic and content type.
           Focus on professional, business-oriented content that would engage a networking audience.
           Return a JSON object with the following structure:

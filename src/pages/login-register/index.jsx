@@ -39,7 +39,7 @@ const LoginRegister = () => {
               <div className="relative">
                 <img 
                   src="/assets/images/cxentric-1751655797090.png" 
-                  alt="cxentric Logo" 
+                  alt="CXentric Logo" 
                   className="w-12 h-12 rounded-xl object-cover shadow-lg"
                   onError={(e) => {
                     e.target.style.display = 'none';
@@ -52,7 +52,7 @@ const LoginRegister = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-heading font-bold text-text-primary">
-                  cxentric
+                  CXentric
                 </h1>
                 <p className="text-sm text-text-muted">
                   Professional Networking Reimagined
@@ -69,7 +69,7 @@ const LoginRegister = () => {
           {/* Welcome Message */}
           <div className="text-center">
             <h2 className="text-xl font-heading font-semibold text-text-primary mb-2">
-              {activeTab === 'login' ? 'Welcome back!' : 'Join cxentric'}
+              {activeTab === 'login' ? 'Welcome back!' : 'Join CXentric'}
             </h2>
             <p className="text-text-secondary">
               {activeTab === 'login' ?'Sign in to your professional network' :'Create your account and connect with industry professionals'
@@ -142,7 +142,7 @@ const LoginRegister = () => {
           </div>
           <div className="text-center mt-4">
             <p className="text-xs text-text-muted">
-              © {new Date().getFullYear()} cxentric. All rights reserved.
+              © {new Date().getFullYear()} CXentric. All rights reserved.
             </p>
           </div>
         </div>

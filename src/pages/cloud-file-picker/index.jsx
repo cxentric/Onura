@@ -51,7 +51,7 @@ const CloudFilePicker = () => {
   return (
     <>
       <Helmet>
-        <title>Cloud File Picker - cxentric</title>
+        <title>Cloud File Picker - CXentric</title>
         <meta name="description" content="Select files from your cloud storage services" />
       </Helmet>
 
