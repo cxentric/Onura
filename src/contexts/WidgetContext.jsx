@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const WidgetContext = createContext();
-const TABS = ['learn', 'quiz', 'hashtags'];
+const TABS = ['today', 'learn', 'quiz', 'hashtags'];
 
 export const useWidget = () => {
   const context = useContext(WidgetContext);
@@ -21,14 +21,14 @@ export const WidgetProvider = ({ children }) => {
     }
     if (saved) {
       // Tabs from the old OpenAI widget ('chat', 'image') no longer exist.
-      return TABS.includes(saved.activeTab) ? saved : { ...saved, activeTab: 'learn' };
+      return TABS.includes(saved.activeTab) ? saved : { ...saved, activeTab: 'today' };
     }
     return {
       position: 'right', // 'left' or 'right'
       isMinimized: true, // Keep minimized by default
       isMaximized: false, // New maximized state
       isVisible: true,
-      activeTab: 'learn', // 'learn', 'quiz', 'hashtags'
+      activeTab: 'today', // 'today', 'learn', 'quiz', 'hashtags'
       hasAutoOpened: false, // Track if auto-open has occurred
       lastInteraction: Date.now() // Track last user interaction
     };
@@ -63,7 +63,7 @@ export const WidgetProvider = ({ children }) => {
     setWidgetSettings(prev => ({ ...prev, ...newSettings }));
   };
 
-  // Sidebar button: open the panel (on the Learn tab), or minimize it if it is already open.
+  // Sidebar button: open the panel (on the Today tab), or minimize it if it is already open.
   const toggleWidget = () => {
     setWidgetSettings(prev => {
       const isOpen = prev.isVisible && !prev.isMinimized;
@@ -72,7 +72,7 @@ export const WidgetProvider = ({ children }) => {
         isVisible: true,
         isMinimized: isOpen,
         isMaximized: false,
-        activeTab: isOpen ? prev.activeTab : 'learn',
+        activeTab: isOpen ? prev.activeTab : 'today',
         lastInteraction: Date.now()
       };
     });

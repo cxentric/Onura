@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../AppIcon';
 import { useWidget } from '../../contexts/WidgetContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { activeStreak, dailyDone, useProgress } from '../../services/progressStore';
 // Panels (and the knowledge base they use) load only when the assistant is opened.
+const TodayPanel = lazy(() => import('./TodayPanel'));
 const LearnPanel = lazy(() => import('./LearnPanel'));
 const QuizPanel = lazy(() => import('./QuizPanel'));
 const HashtagGenerator = lazy(() => import('./HashtagGenerator'));
@@ -12,21 +14,23 @@ const OpenAIWidget = () => {
   const { widgetSettings, minimizeWidget, maximizeWidget, closeWidget, setActiveTab } = useWidget();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+  const progress = useProgress();
+  const streak = activeStreak(progress);
+  const challengePending = !dailyDone(progress);
 
   const { position, isMinimized, isMaximized, isVisible, activeTab } = widgetSettings;
 
   if (!isVisible) return null;
 
-  // Use the saved position settings from profile with mobile adjustments
-  const positionClasses = position === 'left' ? 'left-4 bottom-4' : 'right-4 bottom-4';
-  // Updated mobile positioning to ensure proper spacing from bottom navigation (64px + 16px padding)
-  const mobilePositionClasses = position === 'left' ? 'left-4 bottom-20' : 'right-4 bottom-20';
-  // Maximized: fill the screen below the fixed 64px header and above the mobile bottom nav.
+  // Side comes from the profile setting. Below lg there is a bottom nav bar, so sit above it (bottom-20).
+  // Maximized: fill the screen below the fixed 64px header.
+  const sideClass = position === 'left' ? 'left-4' : 'right-4';
   const responsiveClasses = isMaximized
     ? 'left-4 right-4 top-20 bottom-20 lg:bottom-4'
-    : `${mobilePositionClasses} lg:${positionClasses}`;
+    : `${sideClass} bottom-20 lg:bottom-4`;
 
   const tabs = [
+    { id: 'today', label: 'Today', icon: 'Flame' },
     { id: 'learn', label: 'Learn', icon: 'BookOpen' },
     { id: 'quiz', label: 'Quiz', icon: 'ListChecks' },
     { id: 'hashtags', label: 'Tags', icon: 'Hash' }
@@ -34,12 +38,14 @@ const OpenAIWidget = () => {
 
   const renderActiveTab = () => {
     switch (activeTab) {
+      case 'learn':
+        return <LearnPanel />;
       case 'quiz':
         return <QuizPanel />;
       case 'hashtags':
         return <HashtagGenerator setIsLoading={setIsLoading} />;
       default:
-        return <LearnPanel />;
+        return <TodayPanel />;
     }
   };
 
@@ -69,6 +75,17 @@ const OpenAIWidget = () => {
               </div>
             </div>
             
+            {/* Streak badge and a dot while today's challenge is pending: a nudge to come back daily */}
+            {streak > 0 && (
+              <span className="absolute -top-1 -left-1 flex items-center px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold shadow" aria-label={`${streak}-day streak`}>
+                <Icon name="Flame" size={10} className="mr-0.5" />
+                {streak}
+              </span>
+            )}
+            {challengePending && (
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-error border-2 border-white" aria-label="Today's challenge is waiting" />
+            )}
+
             {/* Loading indicator */}
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -149,7 +166,7 @@ const OpenAIWidget = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 flex items-center justify-center space-x-1 py-2 px-3 text-xs font-medium transition-colors ${
+                  className={`flex-1 flex items-center justify-center space-x-1 py-2 px-1 text-xs font-medium transition-colors ${
                     activeTab === tab.id
                       ? theme === 'dark' ? 'bg-gray-700 text-white border-b-2 border-primary' : 'bg-white text-gray-900 border-b-2 border-primary'
                       : theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'

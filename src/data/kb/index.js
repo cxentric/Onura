@@ -176,3 +176,46 @@ export function relatedItems(item, count = 3) {
     )
     .slice(0, count);
 }
+
+export const itemById = Object.fromEntries(items.map((item) => [item.id, item]));
+
+/**
+ * Everything worth knowing for a career goal (a role in an industry):
+ * its role × industry questions, the role's career questions, and the industry and company questions.
+ */
+export function goalItems(goal) {
+  if (!goal) return [];
+  return items.filter(
+    (item) =>
+      (item.topic === 'roles' && item.industry === goal.industry && item.role === goal.role) ||
+      (item.topic === 'careers' && item.role === goal.role) ||
+      ((item.topic === 'industry' || item.topic === 'companies') && item.industry === goal.industry)
+  );
+}
+
+export const DAILY_SIZE = 5;
+
+/**
+ * The day's challenge: up to 2 earlier mistakes to revise, then questions from the goal
+ * (preferring ones not yet mastered), topped up from the whole bank. Same input → same questions.
+ */
+export function buildDailyChallenge(dateKey, goal, { mistakes = [], mastered = new Set() } = {}) {
+  const random = seededRandom(`${dateKey}:${goal ? `${goal.industry}/${goal.role}` : 'any'}`);
+  const picked = [];
+  const take = (pool, n) => {
+    for (const item of shuffle(pool, random)) {
+      if (picked.length >= DAILY_SIZE || n <= 0) break;
+      if (!picked.includes(item.id)) {
+        picked.push(item.id);
+        n -= 1;
+      }
+    }
+  };
+
+  take(mistakes.map((id) => itemById[id]).filter(Boolean), 2);
+  const pool = goalItems(goal);
+  take(pool.filter((item) => !mastered.has(item.id)), DAILY_SIZE);
+  take(pool, DAILY_SIZE);
+  take(items, DAILY_SIZE);
+  return picked;
+}

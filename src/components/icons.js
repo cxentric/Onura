@@ -26,6 +26,7 @@ import {
   UserCheck, UserMinus, UserPlus, Users, Video, Volume2,
   XCircle, Zap,
   X,
+  RotateCcw, Flame, CalendarCheck, Award, Pencil, Crown, LogIn, LogOut,
 } from 'lucide-react';
 
 const icons = {
@@ -54,6 +55,7 @@ const icons = {
   UserCheck, UserMinus, UserPlus, Users, Video, Volume2,
   XCircle, Zap,
   X,
+  RotateCcw, Flame, CalendarCheck, Award, Pencil, Crown, LogIn, LogOut,
 };
 
 export default icons;
