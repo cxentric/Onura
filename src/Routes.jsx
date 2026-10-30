@@ -1,17 +1,25 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Routes as RouterRoutes, Route } from "react-router-dom";
-// Add your imports here
-import LoginRegister from "pages/login-register";
-import MessagingChat from "pages/messaging-chat";
-import DashboardFeed from "pages/dashboard-feed";
-import ProfileManagement from "pages/profile-management";
-import ComposePublishingTools from "pages/compose-publishing-tools";
-import ThemeCustomizationSettings from "pages/theme-customization-settings";
-import CloudFilePicker from "pages/cloud-file-picker";
-import NotFound from "pages/NotFound";
+
+// Each page is loaded on demand so the first visit downloads only what it needs.
+const LoginRegister = lazy(() => import("pages/login-register"));
+const MessagingChat = lazy(() => import("pages/messaging-chat"));
+const DashboardFeed = lazy(() => import("pages/dashboard-feed"));
+const ProfileManagement = lazy(() => import("pages/profile-management"));
+const ComposePublishingTools = lazy(() => import("pages/compose-publishing-tools"));
+const ThemeCustomizationSettings = lazy(() => import("pages/theme-customization-settings"));
+const CloudFilePicker = lazy(() => import("pages/cloud-file-picker"));
+const NotFound = lazy(() => import("pages/NotFound"));
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const Routes = () => {
   return (
+    <Suspense fallback={<PageLoader />}>
     <RouterRoutes>
       {/* Define your routes here */}
       <Route path="/" element={<DashboardFeed />} />
@@ -24,6 +32,7 @@ const Routes = () => {
       <Route path="/cloud-file-picker" element={<CloudFilePicker />} />
       <Route path="*" element={<NotFound />} />
     </RouterRoutes>
+    </Suspense>
   );
 };
 

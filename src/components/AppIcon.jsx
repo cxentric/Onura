@@ -1,6 +1,7 @@
 import React from 'react';
-import * as LucideIcons from 'lucide-react';
-import { HelpCircle } from 'lucide-react';
+import icons from './icons';
+
+const { HelpCircle } = icons;
 
 function Icon({
     name,
@@ -10,9 +11,12 @@ function Icon({
     strokeWidth = 2,
     ...props
 }) {
-    const IconComponent = LucideIcons[name];
+    const IconComponent = icons[name];
 
     if (!IconComponent) {
+        if (import.meta.env.DEV) {
+            console.warn(`Icon "${name}" is not registered in src/components/icons.js`);
+        }
         return <HelpCircle size={size} color="gray" strokeWidth={strokeWidth} className={className} {...props} />;
     }
 

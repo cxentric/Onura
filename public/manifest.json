@@ -4,12 +4,17 @@
   "icons": [
     {
       "src": "favicon.png",
-      "sizes": "441x441",
+      "sizes": "64x64",
       "type": "image/png"
+    },
+    {
+      "src": "assets/images/logo.webp",
+      "sizes": "128x128",
+      "type": "image/webp"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#2563EB",
   "background_color": "#ffffff"
 }

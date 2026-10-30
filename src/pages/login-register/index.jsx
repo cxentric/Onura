@@ -38,7 +38,7 @@ const LoginRegister = () => {
             <Link to="/" className="inline-flex items-center space-x-3">
               <div className="relative">
                 <img 
-                  src="/assets/images/cxentric-1751655797090.png" 
+                  src="/assets/images/logo.webp" 
                   alt="CXentric Logo" 
                   className="w-12 h-12 rounded-xl object-cover shadow-lg"
                   onError={(e) => {

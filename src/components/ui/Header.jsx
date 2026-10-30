@@ -54,7 +54,7 @@ const Header = () => {
           <div className="flex items-center justify-center h-16">
             <Link to="/" className="flex items-center space-x-2">
               <img 
-                src="/assets/images/cxentric-1751655797090.png" 
+                src="/assets/images/logo.webp" 
                 alt="CXentric Logo" 
                 className="w-8 h-8 rounded-full object-cover"
                 onError={(e) => {
@@ -82,7 +82,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/dashboard-feed" className="flex items-center space-x-2 flex-shrink-0">
             <img 
-              src="/assets/images/cxentric-1751655797090.png" 
+              src="/assets/images/logo.webp" 
               alt="CXentric Logo" 
               className="w-8 h-8 rounded-full object-cover"
               onError={(e) => {

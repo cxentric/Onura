@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../AppIcon';
 import { useWidget } from '../../contexts/WidgetContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import LearnPanel from './LearnPanel';
-import QuizPanel from './QuizPanel';
-import HashtagGenerator from './HashtagGenerator';
+// Panels (and the knowledge base they use) load only when the assistant is opened.
+const LearnPanel = lazy(() => import('./LearnPanel'));
+const QuizPanel = lazy(() => import('./QuizPanel'));
+const HashtagGenerator = lazy(() => import('./HashtagGenerator'));
 
 const OpenAIWidget = () => {
   const { widgetSettings, minimizeWidget, maximizeWidget, closeWidget, setActiveTab } = useWidget();
@@ -61,7 +62,7 @@ const OpenAIWidget = () => {
                 theme === 'dark' ? 'bg-gray-800' : 'bg-white'
               }`}>
                 <img 
-                  src="/assets/images/cxentric-1751651737342.png" 
+                  src="/assets/images/logo.webp" 
                   alt="Career Assistant" 
                   className="w-8 h-8 rounded-full object-cover"
                 />
@@ -97,7 +98,7 @@ const OpenAIWidget = () => {
                     theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                   }`}>
                     <img 
-                      src="/assets/images/cxentric-1751651737342.png" 
+                      src="/assets/images/logo.webp" 
                       alt="Career Assistant" 
                       className="w-4 h-4 rounded-full object-cover"
                     />
@@ -162,7 +163,9 @@ const OpenAIWidget = () => {
 
             {/* Content Area */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {renderActiveTab()}
+              <Suspense fallback={<div className="p-4 text-xs text-center text-gray-500">Loading…</div>}>
+                {renderActiveTab()}
+              </Suspense>
             </div>
           </motion.div>
         )}
