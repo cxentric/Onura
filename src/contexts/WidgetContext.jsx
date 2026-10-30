@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { returnedFromOpenRouter } from '../services/aiKeys';
 
 const WidgetContext = createContext();
-const TABS = ['today', 'learn', 'quiz', 'hashtags'];
+const TABS = ['today', 'learn', 'quiz', 'coach', 'hashtags', 'account'];
+
+// Back from a sign-in link or Google (account screen), or from connecting OpenRouter (AI Coach).
+const returningFromSignIn = () => /[?&]code=/.test(window.location.search);
 
 export const useWidget = () => {
   const context = useContext(WidgetContext);
@@ -19,6 +23,14 @@ export const WidgetProvider = ({ children }) => {
     } catch {
       saved = null;
     }
+    if (returningFromSignIn() || returnedFromOpenRouter) {
+      return {
+        position: 'right', isVisible: true, isMaximized: false, hasAutoOpened: true, ...saved,
+        isMinimized: false,
+        activeTab: returnedFromOpenRouter ? 'coach' : 'account',
+        lastInteraction: Date.now()
+      };
+    }
     if (saved) {
       // Tabs from the old OpenAI widget ('chat', 'image') no longer exist.
       return TABS.includes(saved.activeTab) ? saved : { ...saved, activeTab: 'today' };
@@ -28,7 +40,7 @@ export const WidgetProvider = ({ children }) => {
       isMinimized: true, // Keep minimized by default
       isMaximized: false, // New maximized state
       isVisible: true,
-      activeTab: 'today', // 'today', 'learn', 'quiz', 'hashtags'
+      activeTab: 'today', // one of TABS
       hasAutoOpened: false, // Track if auto-open has occurred
       lastInteraction: Date.now() // Track last user interaction
     };

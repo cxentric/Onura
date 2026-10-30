@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import Icon from '../AppIcon';
 import { TOPICS, filterItems, industryList, itemById, pickQuizQuestions } from '../../data/kb';
-import { mistakeIds, recordAnswer, useProgress } from '../../services/progress';
+import { FREE_RUNS_PER_DAY } from '../../config/plans';
+import { countRun, mistakeIds, recordAnswer, runsToday, useProgress } from '../../services/progress';
+import { UpgradeCard, usePro } from './ProGate';
 import { useKbStyles } from './kbUi';
 import QuizRunner from './QuizRunner';
 
@@ -17,12 +19,24 @@ const QuizPanel = () => {
 
   const available = useMemo(() => filterItems({ industry, topic }).length, [industry, topic]);
   const mistakes = mistakeIds(progress);
+  const pro = usePro();
+  const runsLeft = pro ? Infinity : Math.max(0, FREE_RUNS_PER_DAY - runsToday(progress));
+
+  // Free users get a few practice runs a day; past that, go back to the setup screen, which offers Pro.
+  const begin = (nextRun) => {
+    if (runsLeft <= 0) {
+      setRun(null);
+      return;
+    }
+    countRun();
+    setRun(nextRun);
+  };
 
   const start = () =>
-    setRun({ key: Date.now(), questions: pickQuizQuestions({ industry, topic }, length), title: 'Quiz complete' });
+    begin({ key: Date.now(), questions: pickQuizQuestions({ industry, topic }, length), title: 'Quiz complete' });
 
   const startReview = () =>
-    setRun({
+    begin({
       key: Date.now(),
       questions: mistakes.slice(0, 20).map((id) => itemById[id]).filter(Boolean),
       title: 'Revision complete',
@@ -102,16 +116,28 @@ const QuizPanel = () => {
           ))}
         </div>
       </div>
-      <button
-        onClick={start}
-        disabled={available === 0}
-        className="w-full py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
-      >
-        Start quiz
-      </button>
-      <p className={`text-[10px] text-center ${s.muted}`}>{available} questions available for this selection</p>
+      {runsLeft > 0 ? (
+        <>
+          <button
+            onClick={start}
+            disabled={available === 0}
+            className="w-full py-2 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
+          >
+            Start quiz
+          </button>
+          <p className={`text-[10px] text-center ${s.muted}`}>
+            {available} questions available for this selection
+            {runsLeft !== Infinity && ` · ${runsLeft} free run${runsLeft === 1 ? '' : 's'} left today`}
+          </p>
+        </>
+      ) : (
+        <UpgradeCard
+          title="You’ve used today’s free quiz"
+          text="Today’s challenge is still free, and a new quiz unlocks tomorrow. Go Pro for unlimited quizzes and revision."
+        />
+      )}
 
-      {mistakes.length > 0 && (
+      {mistakes.length > 0 && runsLeft > 0 && (
         <button
           onClick={startReview}
           className={`w-full flex items-center justify-center space-x-2 py-2 rounded-md border text-xs font-medium ${

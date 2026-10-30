@@ -9,3 +9,7 @@ vite.config.*s.*
 .env
 .env.*
 !.env.example
+
+# Cloudflare local secrets
+.dev.vars
+.wrangler/

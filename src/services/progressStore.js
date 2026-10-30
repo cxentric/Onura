@@ -14,6 +14,7 @@ export const emptyState = () => ({
   streak: { current: 0, best: 0, lastDate: null },
   daily: { date: null, ids: [], answers: {} }, // answers: itemId -> correct
   xp: 0,
+  runs: { date: null, count: 0 }, // practice runs (quiz or revision) started today; Free has a daily limit
 });
 
 /** Local calendar date as YYYY-MM-DD (so the day rolls over at the user's midnight). */
@@ -59,12 +60,12 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const subscribe = (listener) => {
+export const subscribeProgress = (listener) => {
   listeners.add(listener);
   return () => listeners.delete(listener);
 };
 
-export const useProgress = () => useSyncExternalStore(subscribe, () => state);
+export const useProgress = () => useSyncExternalStore(subscribeProgress, () => state);
 
 // ---- Derived values that don't need the knowledge base ----
 
@@ -73,6 +74,8 @@ export function activeStreak(s, today = dateKey()) {
   const { current, lastDate } = s.streak;
   return lastDate === today || lastDate === shiftDays(today, -1) ? current : 0;
 }
+
+export const runsToday = (s, today = dateKey()) => (s.runs.date === today ? s.runs.count : 0);
 
 export const dailyDone = (s, today = dateKey()) =>
   s.daily.date === today && s.daily.ids.length > 0 && s.daily.ids.every((id) => id in s.daily.answers);

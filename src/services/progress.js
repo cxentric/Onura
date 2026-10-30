@@ -5,7 +5,7 @@
 import { buildDailyChallenge, goalItems } from '../data/kb';
 import { XP, dateKey, emptyState, setState, shiftDays, state as storeState } from './progressStore';
 
-export { useProgress, activeStreak, dailyDone, dateKey } from './progressStore';
+export { useProgress, activeStreak, dailyDone, dateKey, runsToday } from './progressStore';
 
 // ---- Derived values ----
 
@@ -80,6 +80,12 @@ export function recordDailyAnswer(id, correct) {
       streak: { current, best: Math.max(current, s.streak.best), lastDate: today },
     };
   });
+}
+
+/** Counts a practice run (quiz or revision) towards today's free limit. */
+export function countRun() {
+  const today = dateKey();
+  setState((s) => ({ ...s, runs: { date: today, count: (s.runs.date === today ? s.runs.count : 0) + 1 } }));
 }
 
 export function resetProgress() {

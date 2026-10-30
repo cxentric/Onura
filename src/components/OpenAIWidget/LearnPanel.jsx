@@ -8,12 +8,15 @@ import {
   relatedItems,
   roleList,
 } from '../../data/kb';
+import { useWidget } from '../../contexts/WidgetContext';
+import { askCoach } from '../../services/aiKeys';
 import { itemBadges, useKbStyles } from './kbUi';
 
 const PAGE_SIZE = 30;
 
 const LearnPanel = () => {
   const s = useKbStyles();
+  const { setActiveTab } = useWidget();
   const [industry, setIndustry] = useState('all');
   const [topic, setTopic] = useState('roles');
   const [role, setRole] = useState('all');
@@ -55,6 +58,16 @@ const LearnPanel = () => {
           <p className={`text-sm leading-relaxed ${s.text}`}>{selected.answer}</p>
         </div>
         {selected.topic === 'companies' && <p className={`text-[10px] ${s.muted}`}>{DISCLAIMER}</p>}
+        <button
+          onClick={() => {
+            askCoach(`Tell me more about this, with an example from the job: "${selected.question}"`);
+            setActiveTab('coach');
+          }}
+          className="flex items-center space-x-1 text-xs font-medium text-primary hover:underline"
+        >
+          <Icon name="Bot" size={14} />
+          <span>Go deeper with AI Coach</span>
+        </button>
 
         {related.length > 0 && (
           <div>

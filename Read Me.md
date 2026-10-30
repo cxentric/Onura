@@ -124,10 +124,54 @@ npm run serve
 
 Set `PORT` in the host's environment if needed.
 
-### Vercel
+### Cloudflare Pages (production)
 
-The repo deploys to Vercel as-is: `vercel.json` sets the `build` output folder and client-side routing.
-No environment variables are required.
+The site and its small API (`/functions/api`, for payments) run on Cloudflare Pages. Progress lives in each
+user's browser; the server keeps only accounts, plans and (for Pro) one progress row per user.
+
+1. **Supabase** (accounts and plans)
+   - Create a project, then run [`supabase/schema.sql`](supabase/schema.sql) in **SQL Editor** (safe to re-run).
+   - **Authentication → Providers**: turn on **Google** (needs a Google Cloud OAuth client) and **Email**.
+   - **Authentication → URL Configuration**: Site URL `https://www.cxentric.in`; add redirect URLs
+     `https://www.cxentric.in/**` and `http://localhost:4028/**`.
+2. **Razorpay** (payments)
+   - Complete KYC, and ask Razorpay support to enable **Subscriptions** with **UPI Autopay**.
+   - **Subscriptions → Plans**: create a ₹149 monthly plan and a ₹999 yearly plan; note their `plan_…` ids.
+   - **Settings → Webhooks**: URL `https://www.cxentric.in/api/razorpay-webhook`, a secret of your choice, and
+     the events `order.paid`, `subscription.activated`, `subscription.charged`, `subscription.pending`,
+     `subscription.halted`, `subscription.cancelled`, `subscription.completed`.
+   - Test everything with test-mode keys first.
+3. **Cloudflare Pages**: Workers & Pages → Create → Pages → connect `cxentric/Onura`.
+   Build command `npm run build`, output directory `build`. Under **Settings → Variables and Secrets** add:
+
+   | Variable | Where it comes from | Type |
+   | --- | --- | --- |
+   | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API | plain text (public) |
+   | `SUPABASE_URL` | same as above | plain text |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → API → service_role / secret key | **secret** |
+   | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay → Account & Settings → API keys | **secret** |
+   | `RAZORPAY_WEBHOOK_SECRET` | the secret you set on the webhook | **secret** |
+   | `RAZORPAY_PLAN_MONTHLY`, `RAZORPAY_PLAN_YEARLY` | the plan ids from step 2 | plain text |
+
+   Without the Supabase variables the app runs with accounts off and every feature free.
+4. **Domain**: add `cxentric.in` to Cloudflare, change the nameservers at GoDaddy to the two Cloudflare gives you,
+   then attach `cxentric.in` and `www.cxentric.in` under the Pages project's **Custom domains**.
+   Once it serves the site, remove the domain from Vercel and delete the Vercel project (and `vercel.json`).
+
+`public/_headers` sets the security headers, including a Content-Security-Policy. If you add a script, font or API
+from another site, add its host there.
+
+### Plans
+
+Prices and the Free limits are in [`src/config/plans.js`](src/config/plans.js), shared by the app and the API.
+Free: Learn, the daily challenge, streaks and one quiz or revision run a day. Pro (₹149/month or ₹999/year, as UPI
+Autopay or a one-time pass): unlimited practice, AI Coach, progress sync and the shareable Readiness badge.
+
+### AI Coach
+
+Pro users connect their own AI: a Claude, ChatGPT or Gemini API key, or an OpenRouter account. The key stays in
+their browser and goes only to that provider, so CXentric stores no keys and pays nothing for AI. The coach is
+told the learner's goal, Readiness Score and missed questions. Set `AI_COACH_PRO_ONLY` to `false` to offer it to everyone.
 
 ## 🙏 Acknowledgments
 

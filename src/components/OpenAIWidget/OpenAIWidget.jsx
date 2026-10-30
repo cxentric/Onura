@@ -4,17 +4,22 @@ import Icon from '../AppIcon';
 import { useWidget } from '../../contexts/WidgetContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { activeStreak, dailyDone, useProgress } from '../../services/progressStore';
+import { accountsEnabled, isPro, useAuth } from '../../services/auth';
 // Panels (and the knowledge base they use) load only when the assistant is opened.
 const TodayPanel = lazy(() => import('./TodayPanel'));
 const LearnPanel = lazy(() => import('./LearnPanel'));
 const QuizPanel = lazy(() => import('./QuizPanel'));
 const HashtagGenerator = lazy(() => import('./HashtagGenerator'));
+const CoachPanel = lazy(() => import('./CoachPanel'));
+const AccountPanel = lazy(() => import('./AccountPanel'));
 
 const OpenAIWidget = () => {
   const { widgetSettings, minimizeWidget, maximizeWidget, closeWidget, setActiveTab } = useWidget();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const progress = useProgress();
+  const auth = useAuth();
+  const pro = isPro(auth);
   const streak = activeStreak(progress);
   const challengePending = !dailyDone(progress);
 
@@ -33,6 +38,7 @@ const OpenAIWidget = () => {
     { id: 'today', label: 'Today', icon: 'Flame' },
     { id: 'learn', label: 'Learn', icon: 'BookOpen' },
     { id: 'quiz', label: 'Quiz', icon: 'ListChecks' },
+    { id: 'coach', label: 'Coach', icon: 'Bot' },
     { id: 'hashtags', label: 'Tags', icon: 'Hash' }
   ];
 
@@ -42,6 +48,10 @@ const OpenAIWidget = () => {
         return <LearnPanel />;
       case 'quiz':
         return <QuizPanel />;
+      case 'coach':
+        return <CoachPanel />;
+      case 'account':
+        return <AccountPanel />;
       case 'hashtags':
         return <HashtagGenerator setIsLoading={setIsLoading} />;
       default:
@@ -121,13 +131,27 @@ const OpenAIWidget = () => {
                     />
                   </div>
                 </div>
-                <span className={`text-sm font-medium ${
+                <span className={`text-sm font-medium truncate ${
                   theme === 'dark' ? 'text-white' : 'text-gray-800'
                 }`}>
                   Career Assistant
                 </span>
               </div>
               <div className="flex items-center space-x-1">
+                {accountsEnabled && (
+                  <button
+                    onClick={() => setActiveTab('account')}
+                    className={`flex items-center space-x-1 px-1.5 py-1 rounded text-[11px] font-semibold ${
+                      pro
+                        ? 'text-amber-500'
+                        : theme === 'dark' ? 'text-gray-300 hover:bg-gray-600' : 'text-gray-600 hover:bg-gray-100'
+                    } ${activeTab === 'account' ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                    title={auth.status === 'signed-in' ? 'Account and plan' : 'Sign in or go Pro'}
+                  >
+                    <Icon name={pro ? 'Crown' : auth.status === 'signed-in' ? 'User' : 'LogIn'} size={14} />
+                    <span>{pro ? 'Pro' : auth.status === 'signed-in' ? 'Free' : 'Sign in'}</span>
+                  </button>
+                )}
                 <button
                   onClick={minimizeWidget}
                   className={`p-1 rounded hover:bg-gray-100 ${

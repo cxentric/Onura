@@ -1,0 +1,5 @@
+# Cloudflare Pages project. The site is the static build in /build; /functions holds the API
+# (payments). Secrets are set in the Cloudflare dashboard, never in this file. See "Read Me.md".
+name = "cxentric"
+pages_build_output_dir = "build"
+compatibility_date = "2026-10-01"

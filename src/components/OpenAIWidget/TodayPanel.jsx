@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../AppIcon';
 import { DAILY_SIZE, industryById, industryList, itemById, roleById, roleList } from '../../data/kb';
+import { FREE_RUNS_PER_DAY } from '../../config/plans';
 import {
   activeStreak,
+  countRun,
   dailyDone,
   ensureDailyChallenge,
   mistakeIds,
   readiness,
   recordAnswer,
   recordDailyAnswer,
+  runsToday,
   setGoal,
   useProgress,
 } from '../../services/progress';
+import { usePro } from './ProGate';
+import { useWidget } from '../../contexts/WidgetContext';
 import { useKbStyles } from './kbUi';
+import { shareReadinessBadge } from './shareBadge';
 import QuizRunner from './QuizRunner';
 
 const MILESTONES = [25, 50, 75, 100];
@@ -90,6 +96,7 @@ const TodayPanel = () => {
   const [editingGoal, setEditingGoal] = useState(false);
   const [run, setRun] = useState(null); // 'daily' | 'review'
   const [runKey, setRunKey] = useState(0);
+  const [shareNote, setShareNote] = useState(null);
 
   useEffect(() => {
     ensureDailyChallenge();
@@ -104,7 +111,33 @@ const TodayPanel = () => {
   const nextMilestone = MILESTONES.find((m) => m > ready.percent);
   const toNextMilestone = nextMilestone ? Math.ceil((nextMilestone / 100) * ready.total) - ready.mastered : 0;
 
+  const pro = usePro();
+  const { setActiveTab } = useWidget();
+  const canRevise = pro || runsToday(progress) < FREE_RUNS_PER_DAY;
+
+  const shareBadge = async () => {
+    if (!pro) {
+      setActiveTab('account');
+      return;
+    }
+    const result = await shareReadinessBadge({
+      percent: ready.percent,
+      role: roleById[goal.role].name,
+      industry: industryById[goal.industry].name,
+      streak,
+    });
+    if (result === 'downloaded') setShareNote('Badge downloaded, and a caption copied. Post it on LinkedIn!');
+  };
+
   const startRun = (type) => {
+    // The daily challenge is always free; revision counts as a practice run.
+    if (type === 'review') {
+      if (!canRevise) {
+        setActiveTab('account');
+        return;
+      }
+      countRun();
+    }
     setRun(type);
     setRunKey((k) => k + 1);
   };
@@ -188,10 +221,17 @@ const TodayPanel = () => {
               {ready.mastered} of {ready.total} mastered
               {nextMilestone ? ` · ${toNextMilestone} more to ${nextMilestone}%` : ' · Fully ready!'}
             </p>
-            <button onClick={() => setEditingGoal(true)} className="mt-1 flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
-              <Icon name="Pencil" size={11} />
-              <span>Change goal</span>
-            </button>
+            <div className="mt-1 flex items-center space-x-3">
+              <button onClick={() => setEditingGoal(true)} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+                <Icon name="Pencil" size={11} />
+                <span>Change goal</span>
+              </button>
+              <button onClick={shareBadge} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+                <Icon name={pro ? 'Share2' : 'Crown'} size={11} />
+                <span>Share badge</span>
+              </button>
+            </div>
+            {shareNote && <p className="text-[10px] mt-1 text-success-600">{shareNote}</p>}
           </div>
         </div>
       )}
@@ -238,9 +278,11 @@ const TodayPanel = () => {
           <Icon name="RotateCcw" size={18} className="text-primary flex-shrink-0" />
           <div className="flex-1">
             <p className={`text-xs font-semibold ${s.text}`}>Revise {Math.min(mistakes.length, 10)} missed question{mistakes.length === 1 ? '' : 's'}</p>
-            <p className={`text-[10px] ${s.muted}`}>Get them right to raise your Readiness Score.</p>
+            <p className={`text-[10px] ${s.muted}`}>
+              {canRevise ? 'Get them right to raise your Readiness Score.' : 'Free practice used today. Tap to see Pro.'}
+            </p>
           </div>
-          <Icon name="ChevronRight" size={16} className={s.muted} />
+          <Icon name={canRevise ? 'ChevronRight' : 'Crown'} size={16} className={canRevise ? s.muted : 'text-amber-500'} />
         </button>
       )}
 

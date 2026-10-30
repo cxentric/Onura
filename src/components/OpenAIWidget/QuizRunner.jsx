@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import Icon from '../AppIcon';
 import { getQuizOptions } from '../../data/kb';
+import { useWidget } from '../../contexts/WidgetContext';
+import { askCoach } from '../../services/aiKeys';
 import { itemBadges, useKbStyles } from './kbUi';
 
 /**
@@ -13,6 +15,7 @@ import { itemBadges, useKbStyles } from './kbUi';
  */
 const QuizRunner = ({ questions, onAnswer, initialAnswers = [], renderResultActions, resultTitle }) => {
   const s = useKbStyles();
+  const { setActiveTab } = useWidget();
   const [answers, setAnswers] = useState(initialAnswers); // { item, correct }
   const [index, setIndex] = useState(initialAnswers.length);
   const [chosen, setChosen] = useState(null);
@@ -32,6 +35,19 @@ const QuizRunner = ({ questions, onAnswer, initialAnswers = [], renderResultActi
             {pct >= 90 ? 'Outstanding!' : pct >= 70 ? 'Great job!' : pct >= 40 ? 'Good effort — keep learning.' : 'Keep practising — try Learn mode first.'}
           </p>
         </div>
+        {mistakes.length > 0 && (
+          <button
+            onClick={() => {
+              askCoach(`Help me understand the ones I got wrong:\n${mistakes.map(({ item }) => `- ${item.question}`).join('\n')}`);
+              setActiveTab('coach');
+            }}
+            className={`w-full ${s.card} p-2.5 flex items-center space-x-2 text-left hover:border-primary transition-colors`}
+          >
+            <Icon name="Bot" size={16} className="text-primary flex-shrink-0" />
+            <span className={`flex-1 text-xs font-medium ${s.text}`}>Ask AI Coach to explain my mistakes</span>
+            <Icon name="ChevronRight" size={14} className={s.muted} />
+          </button>
+        )}
         {mistakes.length > 0 && (
           <div>
             <h4 className={`text-xs font-medium mb-1 ${s.muted}`}>Review — these will come back for revision</h4>
