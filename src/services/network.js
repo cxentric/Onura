@@ -25,10 +25,34 @@ export async function getMyCard(userId) {
 }
 
 export async function saveMyCard(userId, { display_name, headline }) {
-  const supabase = await getSupabase();
-  const { error } = await supabase
-    .from('member_profiles')
-    .update({ display_name: display_name.trim().slice(0, 80), headline: headline.trim().slice(0, 140), updated_at: new Date().toISOString() })
-    .eq('id', userId);
-  if (error) throw new Error(error.message);
+  return saveMyProfile(userId, { display_name, headline });
 }
+
+const PROFILE_FIELDS = 'display_name, headline, avatar_url, bio, location, industry, website, skills, created_at';
+
+/** The signed-in member's full profile row. */
+export async function getMyProfile(userId) {
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.from('member_profiles').select(PROFILE_FIELDS).eq('id', userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+const LIMITS = { display_name: 80, headline: 140, bio: 2000, location: 80, industry: 60, website: 200 };
+
+/** Saves any of: display_name, headline, bio, location, industry, website, skills (array of strings). */
+export async function saveMyProfile(userId, fields) {
+  const update = { updated_at: new Date().toISOString() };
+  for (const [key, max] of Object.entries(LIMITS)) {
+    if (fields[key] !== undefined) update[key] = String(fields[key] ?? '').trim().slice(0, max);
+  }
+  if (update.website && !/^https?:\/\//i.test(update.website)) update.website = `https://${update.website}`;
+  if (fields.skills !== undefined) update.skills = fields.skills.map((skill) => skill.trim().slice(0, 40)).filter(Boolean).slice(0, 30);
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('member_profiles').update(update).eq('id', userId);
+  if (error) throw new Error(error.message.includes('website_check') ? 'Enter a website starting with https://' : error.message);
+}
+
+/** { posts, connections } for the signed-in member. */
+export const myProfileStats = () => rpc('my_profile_stats');

@@ -3,6 +3,14 @@ import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 
+const initials = (name) =>
+  (name || '?')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
+// Real members' profiles have no cover photo, follower counts or verified badge yet; those parts are hidden.
 const ProfileHeader = ({ profile, isOwnProfile, onEditToggle, isEditing }) => {
   const [isFollowing, setIsFollowing] = useState(false);
 
@@ -14,12 +22,14 @@ const ProfileHeader = ({ profile, isOwnProfile, onEditToggle, isEditing }) => {
     <div className="relative bg-surface border-b border-border">
       {/* Cover Image */}
       <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary-500 to-accent-500 overflow-hidden">
-        <Image
-          src={profile.coverImage}
-          alt="Profile cover"
-          className="w-full h-full object-cover"
-        />
-        {isOwnProfile && (
+        {profile.coverImage && (
+          <Image
+            src={profile.coverImage}
+            alt="Profile cover"
+            className="w-full h-full object-cover"
+          />
+        )}
+        {isOwnProfile && profile.coverImage && (
           <Button
             variant="ghost"
             size="sm"
@@ -37,12 +47,18 @@ const ProfileHeader = ({ profile, isOwnProfile, onEditToggle, isEditing }) => {
           {/* Profile Photo */}
           <div className="relative -mt-16 sm:-mt-20">
             <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-surface bg-surface overflow-hidden">
-              <Image
-                src={profile.avatar}
-                alt={profile.name}
-                className="w-full h-full object-cover"
-              />
-              {isOwnProfile && (
+              {profile.avatar ? (
+                <Image
+                  src={profile.avatar}
+                  alt={profile.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-primary-100 text-primary flex items-center justify-center text-4xl font-semibold">
+                  {initials(profile.name)}
+                </div>
+              )}
+              {isOwnProfile && profile.coverImage && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -67,13 +83,15 @@ const ProfileHeader = ({ profile, isOwnProfile, onEditToggle, isEditing }) => {
                   {profile.name}
                 </h1>
                 <p className="text-lg text-text-secondary mt-1">
-                  {profile.title}
+                  {profile.title || (isOwnProfile && <span className="text-text-muted">Add a headline with Edit Profile</span>)}
                 </p>
                 <div className="flex items-center space-x-4 mt-2 text-sm text-text-muted">
-                  <div className="flex items-center space-x-1">
-                    <Icon name="MapPin" size={16} />
-                    <span>{profile.location}</span>
-                  </div>
+                  {profile.location && (
+                    <div className="flex items-center space-x-1">
+                      <Icon name="MapPin" size={16} />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-1">
                     <Icon name="Calendar" size={16} />
                     <span>Joined {profile.joinedDate}</span>
@@ -125,18 +143,22 @@ const ProfileHeader = ({ profile, isOwnProfile, onEditToggle, isEditing }) => {
                 </div>
                 <div className="text-sm text-text-muted">Posts</div>
               </div>
-              <div className="text-center">
-                <div className="text-xl font-semibold text-text-primary">
-                  {profile.stats.followers}
+              {profile.stats.followers != null && (
+                <div className="text-center">
+                  <div className="text-xl font-semibold text-text-primary">
+                    {profile.stats.followers}
+                  </div>
+                  <div className="text-sm text-text-muted">Followers</div>
                 </div>
-                <div className="text-sm text-text-muted">Followers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-semibold text-text-primary">
-                  {profile.stats.following}
+              )}
+              {profile.stats.following != null && (
+                <div className="text-center">
+                  <div className="text-xl font-semibold text-text-primary">
+                    {profile.stats.following}
+                  </div>
+                  <div className="text-sm text-text-muted">Following</div>
                 </div>
-                <div className="text-sm text-text-muted">Following</div>
-              </div>
+              )}
               <div className="text-center">
                 <div className="text-xl font-semibold text-text-primary">
                   {profile.stats.connections}

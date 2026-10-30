@@ -6,7 +6,7 @@ import { rpc } from './network';
 
 export const POST_MAX_LENGTH = 3000;
 
-/** Newest first; pass the last post's createdAt as `before` for the next page. */
+/** Newest first; pass the last post's createdAt as `before` for the next page. Scopes: connections, mine, all. */
 export const loadFeed = ({ scope = 'connections', before = null, limit = 20 } = {}) =>
   rpc('feed', { p_scope: scope, p_before: before, p_limit: limit });
 

@@ -183,11 +183,25 @@ create policy "Members edit their own card"
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+-- The rest of the profile page. Members edit these on their own profile.
+alter table public.member_profiles add column if not exists bio text not null default '' check (char_length(bio) <= 2000);
+alter table public.member_profiles add column if not exists location text not null default '' check (char_length(location) <= 80);
+alter table public.member_profiles add column if not exists industry text not null default '' check (char_length(industry) <= 60);
+alter table public.member_profiles add column if not exists website text not null default ''
+  check (website = '' or (website ~ '^https?://[^\s]+$' and char_length(website) <= 200));
+alter table public.member_profiles add column if not exists skills text[] not null default '{}'
+  check (cardinality(skills) <= 30 and char_length(array_to_string(skills, ',')) <= 1000);
+alter table public.member_profiles add column if not exists created_at timestamptz not null default now();
+
 -- Cards for people who signed up before this table existed.
 insert into public.member_profiles (id, display_name)
 select u.id, left(coalesce(nullif(u.raw_user_meta_data ->> 'full_name', ''), split_part(u.email, '@', 1)), 80)
 from auth.users u
 on conflict (id) do nothing;
+
+-- "Joined" date: when the account was created.
+update public.member_profiles m set created_at = u.created_at
+from auth.users u where u.id = m.id and m.created_at <> u.created_at;
 
 -- =====================================================================================
 -- 6. Admin team. Roles, from most to least power:
@@ -927,7 +941,7 @@ begin
 end;
 $$;
 
--- p_scope: 'connections' (you and your connections) or 'all' (super admin only).
+-- p_scope: 'connections' (you and your connections), 'mine' (your own posts) or 'all' (super admin only).
 -- For the founder, 'connections' leaves out the automatic links, so it means the people they chose.
 create or replace function public.feed(p_scope text default 'connections', p_before timestamptz default null, p_limit integer default 20)
 returns jsonb
@@ -940,7 +954,7 @@ declare
   v_founder uuid := (select user_id from public.admins where role = 'super_admin');
 begin
   if v_me is null then raise exception 'Please sign in first.'; end if;
-  if p_scope not in ('connections', 'all') then raise exception 'Unknown feed.'; end if;
+  if p_scope not in ('connections', 'mine', 'all') then raise exception 'Unknown feed.'; end if;
   if p_scope = 'all' and v_role is distinct from 'super_admin' then
     raise exception 'Only the super admin can see every member''s posts.' using errcode = '42501';
   end if;
@@ -954,7 +968,7 @@ begin
     from (
       select * from public.posts p
       where (p_before is null or p.created_at < p_before)
-        and (p_scope = 'all' or p.author_id = v_me or exists (
+        and (p_scope = 'all' or p.author_id = v_me or p_scope = 'connections' and exists (
           select 1 from public.connections c
           where c.user_a = least(v_me, p.author_id) and c.user_b = greatest(v_me, p.author_id)
             and c.status = 'accepted' and not (c.auto and v_role is not distinct from 'super_admin')))
@@ -965,8 +979,21 @@ begin
 end;
 $$;
 
+-- Counts for the signed-in member's profile page. For the founder, connections are the people they chose.
+create or replace function public.my_profile_stats()
+returns jsonb
+language sql stable
+security definer set search_path = ''
+as $$
+  select jsonb_build_object(
+    'posts', (select count(*) from public.posts where author_id = auth.uid()),
+    'connections', (select count(*) from public.connections c
+                    where auth.uid() in (c.user_a, c.user_b) and c.status = 'accepted'
+                      and not (c.auto and public.admin_role() is not distinct from 'super_admin')));
+$$;
+
 revoke all on function public.create_post(text, text), public.delete_post(bigint, text),
-  public.feed(text, timestamptz, integer) from public, anon;
+  public.feed(text, timestamptz, integer), public.my_profile_stats() from public, anon;
 
 -- =====================================================================================
 -- 14. Backup recovery. The backup email can ask to take over as super admin; it happens only after

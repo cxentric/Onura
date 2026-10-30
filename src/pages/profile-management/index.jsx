@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../../components/ui/Header';
 import Sidebar from '../../components/ui/Sidebar';
 import ProfileHeader from './components/ProfileHeader';
@@ -7,12 +7,53 @@ import ProfileTabs from './components/ProfileTabs';
 import PostsGrid from './components/PostsGrid';
 import ConnectionsList from './components/ConnectionsList';
 import MyNetwork from './components/MyNetwork';
-import { accountsEnabled } from '../../services/auth';
+import { accountsEnabled, useAuth } from '../../services/auth';
+import { getMyProfile, myProfileStats, saveMyProfile } from '../../services/network';
+import { deletePost, loadFeed } from '../../services/posts';
+import PostCard from '../dashboard-feed/components/PostCard';
+import Button from '../../components/ui/Button';
+import { openSignIn } from '../../components/SignInModal';
 import ProfileSettings from './components/ProfileSettings';
 import AIInsights from './components/AIInsights';
 import DocumentsTab from './components/DocumentsTab';
 
+const joined = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) : '');
+
+// The signed-in member's profile row and counts, in the shape the profile components expect.
+const toProfile = (row, stats, email) => ({
+  name: row?.display_name || email?.split('@')[0] || 'CXentric member',
+  title: row?.headline || '',
+  bio: row?.bio || '',
+  location: row?.location || '',
+  industry: row?.industry || '',
+  website: row?.website || '',
+  skills: row?.skills || [],
+  niches: [],
+  socialLinks: [],
+  avatar: row?.avatar_url || null,
+  coverImage: null,
+  isVerified: false,
+  joinedDate: joined(row?.created_at),
+  stats: { posts: stats?.posts ?? 0, connections: stats?.connections ?? 0 },
+});
+
+const toCard = (post) => ({
+  id: post.id,
+  type: 'text',
+  content: post.body,
+  niche: post.niche,
+  timestamp: post.createdAt,
+  mine: post.mine,
+  author: { name: post.author.name, title: post.author.headline || '', avatar: post.author.avatar, isFounder: post.author.isFounder },
+});
+
 const ProfileManagement = () => {
+  const auth = useAuth();
+  const signedIn = auth.status === 'signed-in';
+  const [me, setMe] = useState(null);
+  const [myPosts, setMyPosts] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
@@ -323,10 +364,52 @@ const ProfileManagement = () => {
     setIsEditing(!isEditing);
   };
 
-  const handleProfileUpdate = (updatedData) => {
-    setProfile(prev => ({ ...prev, ...updatedData }));
+  const loadMe = useCallback(async () => {
+    try {
+      const [row, stats] = await Promise.all([getMyProfile(auth.user.id), myProfileStats()]);
+      setMe(toProfile(row, stats, auth.user.email));
+    } catch (err) {
+      setLoadError(err.message);
+    }
+  }, [auth.user?.id, auth.user?.email]);
+
+  useEffect(() => {
+    if (signedIn) loadMe();
+    else setMe(null);
+  }, [signedIn, loadMe]);
+
+  useEffect(() => {
+    if (!signedIn || activeTab !== 'posts') return;
+    loadFeed({ scope: 'mine', limit: 50 }).then((rows) => setMyPosts(rows.map(toCard)), (err) => setLoadError(err.message));
+  }, [signedIn, activeTab]);
+
+  const handleDeletePost = async (post) => {
+    if (!window.confirm('Delete this post?')) return;
+    await deletePost(post.id);
+    setMyPosts((prev) => prev.filter((p) => p.id !== post.id));
+    loadMe();
+  };
+
+  const handleProfileUpdate = async (updatedData) => {
+    if (!signedIn) {
+      setProfile(prev => ({ ...prev, ...updatedData }));
+      setIsEditing(false);
+      return;
+    }
+    await saveMyProfile(auth.user.id, {
+      display_name: updatedData.name,
+      headline: updatedData.title,
+      bio: updatedData.bio,
+      location: updatedData.location,
+      website: updatedData.website,
+      industry: updatedData.industry,
+      skills: updatedData.skills,
+    });
+    await loadMe();
     setIsEditing(false);
   };
+
+  const shown = signedIn ? me : profile;
 
   const handleSettingsUpdate = (updatedSettings) => {
     console.log('Settings updated:', updatedSettings);
@@ -338,15 +421,22 @@ const ProfileManagement = () => {
         return (
           <div className="space-y-6">
             <ProfileBio
-              profile={profile}
+              profile={shown}
               isEditing={isEditing}
               onSave={handleProfileUpdate}
             />
-            <AIInsights insights={aiInsights} />
+            {!signedIn && <AIInsights insights={aiInsights} />}
           </div>
         );
       case 'posts':
-        return <PostsGrid posts={posts} />;
+        if (!signedIn) return <PostsGrid posts={posts} />;
+        if (!myPosts) return <p className="text-text-muted">Loading your posts…</p>;
+        if (!myPosts.length) return <p className="text-text-muted">You haven’t posted yet. Share something from the home feed.</p>;
+        return (
+          <div className="space-y-6 max-w-2xl">
+            {myPosts.map((post) => <PostCard key={post.id} post={post} showActions={false} onDelete={handleDeletePost} />)}
+          </div>
+        );
       case 'connections':
         // Real connections when accounts are on; the sample list otherwise.
         if (accountsEnabled) return <MyNetwork />;
@@ -372,7 +462,7 @@ const ProfileManagement = () => {
   };
 
   useEffect(() => {
-    document.title = "Profile Management - NicheConnect";
+    document.title = "Your profile - CXentric";
   }, []);
 
   return (
@@ -381,9 +471,23 @@ const ProfileManagement = () => {
       <Sidebar />
       
       <main className="lg:pl-64 pt-16">
+        {auth.status === 'signed-out' && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <div className="bg-primary-50 border border-primary-100 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <p className="font-medium text-text-primary">This is a sample profile</p>
+                <p className="text-sm text-text-secondary">Sign in with Google or your email to create your own.</p>
+              </div>
+              <Button onClick={() => openSignIn('Sign in to create your profile.')} iconName="LogIn" iconPosition="left">Sign in</Button>
+            </div>
+          </div>
+        )}
+        {!shown ? (
+          <p className="p-8 text-text-muted">{loadError || 'Loading your profile…'}</p>
+        ) : (
         <div className="max-w-6xl mx-auto">
           <ProfileHeader
-            profile={profile}
+            profile={shown}
             isOwnProfile={true}
             onEditToggle={handleEditToggle}
             isEditing={isEditing}
@@ -392,13 +496,14 @@ const ProfileManagement = () => {
           <ProfileTabs
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            stats={profile.stats}
+            stats={shown.stats}
           />
           
           <div className="p-4 sm:p-6 lg:p-8">
             {renderTabContent()}
           </div>
         </div>
+        )}
       </main>
       
       {/* Mobile bottom padding for navigation */}
