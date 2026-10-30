@@ -4,7 +4,7 @@
  */
 import { getSupabase } from './auth';
 
-async function rpc(name, args) {
+export async function rpc(name, args) {
   const supabase = await getSupabase();
   const { data, error } = await supabase.rpc(name, args);
   if (error) throw new Error(error.message);

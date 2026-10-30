@@ -8,6 +8,7 @@ import Settings from './pages/Settings';
 import Questions from './pages/Questions';
 import Team from './pages/Team';
 import AuditLog from './pages/AuditLog';
+import { BackupScreen, RecoveryBanner, useRecoveryStatus } from './Recovery';
 
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', component: Dashboard },
@@ -66,6 +67,7 @@ const App = () => {
   const [session, setSession] = useState(undefined);
   const [role, setRole] = useState(undefined);
   const [page, setPage] = useState(() => window.location.hash.slice(1) || 'dashboard');
+  const [recovery, reloadRecovery] = useRecoveryStatus(session?.user?.id);
 
   useEffect(() => {
     if (!configured) return undefined;
@@ -93,6 +95,12 @@ const App = () => {
     return <p className="p-8 text-slate-500">Loading…</p>;
   }
   if (!session) return <SignIn />;
+  if (!role && recovery === undefined) {
+    return <p className="p-8 text-slate-500">Loading…</p>;
+  }
+  if (!role && recovery?.as === 'backup') {
+    return <BackupScreen session={session} status={recovery} onChange={reloadRecovery} />;
+  }
   if (!role) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-4 text-center">
@@ -128,6 +136,7 @@ const App = () => {
           </nav>
         </aside>
         <div className="flex-1 min-w-0">
+          <RecoveryBanner status={recovery} onChange={reloadRecovery} />
           <header className="flex items-center justify-between gap-3 px-6 py-3 bg-white border-b border-slate-200">
             <h1 className="font-semibold text-slate-900">{current.label}</h1>
             <div className="flex items-center gap-3 text-sm">

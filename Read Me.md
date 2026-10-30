@@ -124,6 +124,16 @@ npm run serve
 
 Set `PORT` in the host's environment if needed.
 
+### Staging and going live
+
+All changes go to the `staging` branch first and are checked on its preview link. Only after approval is
+`staging` merged into `main`, which is what the live site deploys. There are no other deployment branches.
+
+```bash
+git switch staging && git push
+git switch main && git merge --ff-only staging && git push   # only after approval
+```
+
 ### Cloudflare Pages (production)
 
 The site and its small API (`/functions/api`, for payments) run on Cloudflare Pages. Progress lives in each
@@ -194,23 +204,24 @@ which nobody can edit or delete. The database enforces the roles, so the console
 | **Member** | read only; emails are partly hidden |
 
 The founder is connected to every member automatically, and members can't remove that connection.
+On the feed the super admin can switch between **All members** (every member's posts) and **My connections** (only
+people the founder chose to connect with; the automatic links don't count), and can remove any post (logged).
 
 Setup:
 
 1. Re-run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor.
-2. Sign in to CXentric once with the founder's account, then in the SQL Editor run (once, with that email):
+2. Sign in to CXentric once with **cxentric@gmail.com**, then in the SQL Editor run (once):
    ```sql
-   select public.make_super_admin('founder@example.com');
+   select public.make_super_admin('cxentric@gmail.com', 'seenivenkat1410@gmail.com');
    ```
-   This makes that account the super admin and connects it to every existing member. It refuses if there is
-   already a super admin, and nobody can change or remove the super admin, not even from the SQL Editor. To hand
-   over in future, run in the SQL Editor:
-   ```sql
-   alter table public.admins disable trigger protect_super_admin;
-   delete from public.admins where role = 'super_admin';
-   alter table public.admins enable trigger protect_super_admin;
-   select public.make_super_admin('new-founder@example.com');
-   ```
+   This makes cxentric@gmail.com the super admin, connects it to every existing member, and sets
+   seenivenkat1410@gmail.com as the backup. It refuses if there is already a super admin, and nobody can change or
+   remove the super admin directly, not even from the SQL Editor.
+
+   **Backup recovery.** If cxentric@gmail.com loses access, sign in to the admin console with the backup email and
+   choose **Ask to take over**. After 72 hours the backup becomes the super admin, unless the super admin cancels
+   from the red warning at the top of the console. The super admin can change the backup under **Admin team**.
+   Nothing is emailed, so open the console now and then.
 3. Supabase → **Authentication → URL Configuration**: add the redirect URL `https://admin.cxentric.in/**`
    (and `http://localhost:4029/**` for local work).
 4. Cloudflare → create a second Pages project from `cxentric/Onura`:

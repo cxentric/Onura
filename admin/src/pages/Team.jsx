@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ROLE_HELP, ROLE_LABELS, can, date, rpc } from '../lib';
 import { Badge, Button, Card, ErrorText, Field, inputClass, useReason } from '../ui';
+import { BackupEmailCard } from '../Recovery';
 
 const ASSIGNABLE = ['app_admin', 'user_admin', 'member'];
 
@@ -92,6 +93,8 @@ const Team = ({ role }) => {
           </table>
         </div>
       </Card>
+
+      {role === 'super_admin' && <BackupEmailCard />}
 
       {manage && (
         <Card title="Add someone">

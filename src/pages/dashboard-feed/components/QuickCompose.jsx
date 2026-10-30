@@ -3,22 +3,29 @@ import { Link } from 'react-router-dom';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 import LocationPicker from '../../../components/ui/LocationPicker';
+import { POST_MAX_LENGTH } from '../../../services/posts';
 
-const QuickCompose = ({ onQuickPost }) => {
+/** `onQuickPost` may return a promise; the text is kept if it fails. */
+const QuickCompose = ({ onQuickPost, placeholder = 'Share your thoughts with your network...' }) => {
   const [quickPostText, setQuickPostText] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleQuickPost = () => {
-    if (quickPostText.trim()) {
-      const postData = {
-        text: quickPostText,
-        location: selectedLocation
-      };
-      onQuickPost?.(postData);
+  const handleQuickPost = async () => {
+    if (!quickPostText.trim()) return;
+    setPosting(true);
+    setError(null);
+    try {
+      await onQuickPost?.({ text: quickPostText, location: selectedLocation });
       setQuickPostText('');
       setSelectedLocation(null);
       setIsExpanded(false);
+    } catch (err) {
+      setError(err.message || 'Could not post. Please try again.');
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -54,7 +61,7 @@ const QuickCompose = ({ onQuickPost }) => {
   };
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 space-y-4 hidden">
+    <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
       <div className="flex items-center space-x-3">
         <div className="w-10 h-10 bg-secondary-200 rounded-full flex items-center justify-center">
           <Icon name="User" size={18} className="text-text-muted" />
@@ -64,7 +71,7 @@ const QuickCompose = ({ onQuickPost }) => {
             value={quickPostText}
             onChange={(e) => setQuickPostText(e.target.value)}
             onFocus={() => setIsExpanded(true)}
-            placeholder="Share your thoughts with your network..."
+            placeholder={placeholder}
             className="w-full p-3 border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             rows={isExpanded ? 3 : 1} />
 
@@ -93,19 +100,20 @@ const QuickCompose = ({ onQuickPost }) => {
 
             </div>
             <div className="flex items-center space-x-2">
-              <span className={`text-xs ${quickPostText.length > 280 ? 'text-error' : 'text-text-muted'}`}>
-                {quickPostText.length}/280
+              <span className={`text-xs ${quickPostText.length > POST_MAX_LENGTH ? 'text-error' : 'text-text-muted'}`}>
+                {quickPostText.length}/{POST_MAX_LENGTH}
               </span>
               <Button
               variant="primary"
               size="sm"
               onClick={handleQuickPost}
-              disabled={!quickPostText.trim() || quickPostText.length > 280}>
+              disabled={posting || !quickPostText.trim() || quickPostText.length > POST_MAX_LENGTH}>
 
-                Post
+                {posting ? 'Posting…' : 'Post'}
               </Button>
             </div>
           </div>
+          {error && <p className="text-sm text-error">{error}</p>}
         </div>
       }
 

@@ -16,6 +16,7 @@ let state = {
   user: null,
   proUntil: null,
   subscription: null, // latest Autopay subscription, if any
+  role: null, // admin role (super_admin, app_admin, user_admin, member) or null for members
 };
 const listeners = new Set();
 const setAuth = (patch) => {
@@ -51,23 +52,24 @@ export function getSupabase() {
 
 async function applySession(session) {
   if (!session) {
-    setAuth({ status: 'signed-out', user: null, proUntil: null, subscription: null });
+    setAuth({ status: 'signed-out', user: null, proUntil: null, subscription: null, role: null });
     return;
   }
   setAuth({ status: 'signed-in', user: { id: session.user.id, email: session.user.email } });
   await refreshPlan();
 }
 
-/** Reloads the plan expiry and the latest Autopay subscription (readable by their owner only). */
+/** Reloads the plan expiry, the latest Autopay subscription (readable by their owner only) and any admin role. */
 export async function refreshPlan() {
   const supabase = await getSupabase();
   const userId = state.user?.id;
   if (!userId) return;
-  const [profile, subs] = await Promise.all([
+  const [profile, subs, role] = await Promise.all([
     supabase.from('profiles').select('pro_until').eq('id', userId).maybeSingle(),
     supabase.from('subscriptions').select('id, plan, status, current_end').order('created_at', { ascending: false }).limit(1),
+    supabase.rpc('admin_role'),
   ]);
-  setAuth({ proUntil: profile.data?.pro_until ?? null, subscription: subs.data?.[0] ?? null });
+  setAuth({ proUntil: profile.data?.pro_until ?? null, subscription: subs.data?.[0] ?? null, role: role.data ?? null });
 }
 
 const hasSavedSession = () => {

@@ -3,9 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 import Input from './Input';
+import { openSignIn } from '../SignInModal';
+import { useAuth } from '../../services/auth';
 
 const Header = () => {
   const location = useLocation();
+  const auth = useAuth();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -239,14 +242,20 @@ const Header = () => {
               }
             </div>
 
-            {/* Profile Menu */}
-            <Link to="/profile-management">
-              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-secondary-200 rounded-full flex items-center justify-center">
-                  <Icon name="User" size={16} className="text-text-muted" />
-                </div>
+            {/* Profile Menu, or Sign in for visitors */}
+            {auth.status === 'signed-out' ? (
+              <Button size="sm" onClick={() => openSignIn()}>
+                Sign in
               </Button>
-            </Link>
+            ) : (
+              <Link to="/profile-management">
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-secondary-200 rounded-full flex items-center justify-center">
+                    <Icon name="User" size={16} className="text-text-muted" />
+                  </div>
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 

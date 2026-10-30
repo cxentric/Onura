@@ -3,12 +3,25 @@ import Icon from '../../../components/AppIcon';
 import Image from '../../../components/AppImage';
 import Button from '../../../components/ui/Button';
 
-const PostCard = ({ post, onLike, onComment, onShare }) => {
+const initials = (name) =>
+  (name || '?')
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
+/**
+ * `onLocked`: for visitors, every action calls this (to ask them to sign in) instead.
+ * `showActions`: false for members' posts, which don't have likes or comments yet.
+ * `onDelete`: shows a Delete option (your own posts, or any post for the super admin).
+ */
+const PostCard = ({ post, onLike, onComment, onShare, onLocked, showActions = true, onDelete }) => {
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likeCount, setLikeCount] = useState(post.likes || 0);
   const [showComments, setShowComments] = useState(false);
 
   const handleLike = () => {
+    if (onLocked) return onLocked('Sign in to like posts.');
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
     setLikeCount(prev => newLikedState ? prev + 1 : prev - 1);
@@ -16,11 +29,13 @@ const PostCard = ({ post, onLike, onComment, onShare }) => {
   };
 
   const handleComment = () => {
+    if (onLocked) return onLocked('Sign in to comment.');
     setShowComments(!showComments);
     onComment?.(post.id);
   };
 
   const handleShare = () => {
+    if (onLocked) return onLocked('Sign in to share posts.');
     onShare?.(post.id);
   };
 
@@ -118,17 +133,29 @@ const PostCard = ({ post, onLike, onComment, onShare }) => {
       {/* Post Header */}
       <div className="flex items-start space-x-3">
         <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-          <Image
-            src={post.author.avatar}
-            alt={post.author.name}
-            className="w-full h-full object-cover"
-          />
+          {post.author.avatar ? (
+            <Image
+              src={post.author.avatar}
+              alt={post.author.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-primary-100 text-primary flex items-center justify-center text-sm font-semibold">
+              {initials(post.author.name)}
+            </div>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2">
             <h4 className="font-medium text-text-primary truncate">{post.author.name}</h4>
             {post.author.verified && (
               <Icon name="CheckCircle" size={16} className="text-primary flex-shrink-0" />
+            )}
+            {post.author.isFounder && (
+              <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium flex-shrink-0">
+                <Icon name="Crown" size={12} />
+                <span>Founder</span>
+              </span>
             )}
             <span className="text-text-muted">•</span>
             <span className="text-sm text-text-muted">{formatTimeAgo(post.timestamp)}</span>
@@ -149,9 +176,17 @@ const PostCard = ({ post, onLike, onComment, onShare }) => {
             )}
           </div>
         </div>
-        <Button variant="ghost" size="sm">
-          <Icon name="MoreHorizontal" size={16} />
-        </Button>
+        {onDelete ? (
+          <Button variant="ghost" size="sm" onClick={() => onDelete(post)} aria-label="Delete post" className="text-text-muted hover:text-error">
+            <Icon name="Trash2" size={16} />
+          </Button>
+        ) : (
+          showActions && (
+            <Button variant="ghost" size="sm" onClick={() => onLocked?.()}>
+              <Icon name="MoreHorizontal" size={16} />
+            </Button>
+          )
+        )}
       </div>
 
       {/* Post Content */}
@@ -160,6 +195,7 @@ const PostCard = ({ post, onLike, onComment, onShare }) => {
       </div>
 
       {/* Post Actions */}
+      {showActions && (
       <div className="flex items-center justify-between pt-3 border-t border-border-muted">
         <div className="flex items-center space-x-6">
           <Button
@@ -193,10 +229,11 @@ const PostCard = ({ post, onLike, onComment, onShare }) => {
           </Button>
         </div>
         
-        <Button variant="ghost" size="sm" className="text-text-muted hover:text-text-primary">
+        <Button variant="ghost" size="sm" onClick={() => onLocked?.('Sign in to save posts.')} className="text-text-muted hover:text-text-primary">
           <Icon name="Bookmark" size={18} />
         </Button>
       </div>
+      )}
 
       {/* Comments Section */}
       {showComments && (

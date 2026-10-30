@@ -40,8 +40,8 @@ begin
   -- Every member is connected to the founder (the super admin) from the start.
   select user_id into v_founder from public.admins where role = 'super_admin';
   if v_founder is not null and v_founder <> new.id then
-    insert into public.connections (user_a, user_b, status, requested_by, accepted_at)
-    values (least(v_founder, new.id), greatest(v_founder, new.id), 'accepted', v_founder, now())
+    insert into public.connections (user_a, user_b, status, requested_by, accepted_at, auto)
+    values (least(v_founder, new.id), greatest(v_founder, new.id), 'accepted', v_founder, now(), true)
     on conflict do nothing;
   end if;
   return new;
@@ -225,7 +225,9 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if old.role = 'super_admin' and exists (select 1 from auth.users where id = old.user_id) then
+  -- Only recovery_complete() (section 14) may hand over, after the 72-hour wait.
+  if old.role = 'super_admin' and exists (select 1 from auth.users where id = old.user_id)
+     and coalesce(current_setting('cxentric.recovery', true), '') <> 'on' then
     raise exception 'The super admin can''t be changed or removed.';
   end if;
   if tg_op = 'DELETE' then
@@ -480,6 +482,10 @@ create table if not exists public.connections (
 
 create index if not exists connections_user_b on public.connections (user_b);
 
+-- true for the founder's automatic link with each member. The founder's own "Connections" view leaves
+-- these out, so it shows only the people the founder chose.
+alter table public.connections add column if not exists auto boolean not null default false;
+
 alter table public.connections enable row level security;
 
 drop policy if exists "Members see their own connections" on public.connections;
@@ -526,6 +532,11 @@ begin
 
   select * into v_row from public.connections where user_a = least(v_me, p_other) and user_b = greatest(v_me, p_other);
   if found then
+    -- The founder adds an automatically linked member to their own connections.
+    if v_row.auto and public.admin_role() = 'super_admin' then
+      update public.connections set auto = false where user_a = v_row.user_a and user_b = v_row.user_b;
+      return 'accepted';
+    end if;
     if v_row.status = 'pending' and v_row.requested_by = p_other then
       update public.connections set status = 'accepted', accepted_at = now() where user_a = v_row.user_a and user_b = v_row.user_b;
       return 'accepted';
@@ -558,12 +569,20 @@ end;
 $$;
 
 -- Remove a connection or withdraw a request (refused for the founder by the trigger above).
+-- When the founder removes someone, the automatic link stays: they just leave the founder's own list.
 create or replace function public.connect_remove(p_other uuid)
 returns void
-language sql
+language plpgsql
 security definer set search_path = ''
 as $$
+begin
+  if public.admin_role() = 'super_admin' then
+    update public.connections set auto = true
+    where user_a = least(auth.uid(), p_other) and user_b = greatest(auth.uid(), p_other) and status = 'accepted';
+    if found then return; end if;
+  end if;
   delete from public.connections where user_a = least(auth.uid(), p_other) and user_b = greatest(auth.uid(), p_other);
+end;
 $$;
 
 -- The signed-in member's network: connections, requests received and requests sent.
@@ -576,6 +595,7 @@ as $$
     select case when c.user_a = auth.uid() then c.user_b else c.user_a end as other, c.status, c.requested_by, c.created_at, c.accepted_at
     from public.connections c
     where auth.uid() in (c.user_a, c.user_b)
+      and not (c.auto and public.admin_role() is not distinct from 'super_admin')
   ), founder as (
     select user_id from public.admins where role = 'super_admin'
   ), cards as (
@@ -598,7 +618,8 @@ security definer set search_path = ''
 as $$
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', p.id, 'name', p.display_name, 'headline', p.headline, 'avatar', p.avatar_url,
-           'status', (select c.status from public.connections c where c.user_a = least(auth.uid(), p.id) and c.user_b = greatest(auth.uid(), p.id))
+           'status', (select c.status from public.connections c where c.user_a = least(auth.uid(), p.id) and c.user_b = greatest(auth.uid(), p.id)
+                        and not (c.auto and public.admin_role() is not distinct from 'super_admin'))
          )), '[]')
   from (
     select * from public.member_profiles
@@ -809,9 +830,26 @@ revoke all on function public.admin_stats(), public.admin_list_users(text, integ
 
 -- =====================================================================================
 -- 12. One-time set-up: make the founder the super admin. Run in the SQL Editor after signing in
---     to CXentric once with that email:   select public.make_super_admin('founder@example.com');
+--     to CXentric once with that email:
+--       select public.make_super_admin('founder@example.com', 'backup@example.com');
 --     Works only while there is no super admin, and connects the founder to every existing member.
-create or replace function public.make_super_admin(p_email text)
+--     The second email (optional) is the backup that can take over after 72 hours (section 14).
+
+-- Links the founder to every member (automatic links, see connections.auto).
+create or replace function public.connect_founder_to_everyone(p_founder uuid)
+returns void
+language sql
+security definer set search_path = ''
+as $$
+  insert into public.connections (user_a, user_b, status, requested_by, accepted_at, auto)
+  select least(p_founder, u.id), greatest(p_founder, u.id), 'accepted', p_founder, now(), true
+  from auth.users u where u.id <> p_founder
+  on conflict (user_a, user_b) do update set status = 'accepted', accepted_at = coalesce(public.connections.accepted_at, now());
+$$;
+revoke all on function public.connect_founder_to_everyone(uuid) from public, anon, authenticated, service_role;
+
+drop function if exists public.make_super_admin(text);
+create or replace function public.make_super_admin(p_email text, p_backup_email text default null)
 returns text
 language plpgsql
 security definer set search_path = ''
@@ -824,15 +862,246 @@ begin
 
   insert into public.admins (user_id, role) values (v_user, 'super_admin')
   on conflict (user_id) do update set role = 'super_admin';
+  perform public.connect_founder_to_everyone(v_user);
 
-  insert into public.connections (user_a, user_b, status, requested_by, accepted_at)
-  select least(v_user, u.id), greatest(v_user, u.id), 'accepted', v_user, now()
-  from auth.users u where u.id <> v_user
-  on conflict (user_a, user_b) do update set status = 'accepted', accepted_at = coalesce(public.connections.accepted_at, now());
+  if nullif(trim(p_backup_email), '') is not null then
+    perform public.save_backup_email(p_backup_email, lower(trim(p_email)));
+  end if;
 
-  perform public.write_audit(v_user, 'team.super_admin', p_email, null, jsonb_build_object('role', 'super_admin'), 'Initial set-up');
+  perform public.write_audit(v_user, 'team.super_admin', p_email, null,
+    jsonb_build_object('role', 'super_admin', 'backup', lower(trim(p_backup_email))), 'Initial set-up');
   return 'Done: ' || p_email || ' is the super admin.';
 end;
 $$;
 
-revoke all on function public.make_super_admin(text) from public, anon, authenticated, service_role;
+revoke all on function public.make_super_admin(text, text) from public, anon, authenticated, service_role;
+
+-- =====================================================================================
+-- 13. Posts and the feed. Members see their own posts and their connections' posts.
+--     The super admin can also see every member's posts ("all").
+create table if not exists public.posts (
+  id bigint generated always as identity primary key,
+  author_id uuid not null references auth.users (id) on delete cascade,
+  body text not null check (length(trim(body)) between 1 and 3000),
+  niche text check (niche is null or length(niche) <= 40),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists posts_author_created on public.posts (author_id, created_at desc);
+create index if not exists posts_created on public.posts (created_at desc);
+
+alter table public.posts enable row level security;
+-- No policies: posts are read and written through the functions below.
+
+create or replace function public.create_post(p_body text, p_niche text default null)
+returns bigint
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_id bigint;
+begin
+  if auth.uid() is null then raise exception 'Please sign in first.'; end if;
+  insert into public.posts (author_id, body, niche) values (auth.uid(), trim(p_body), nullif(trim(p_niche), ''))
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- Authors delete their own posts; the super admin and user admins can remove any post (logged).
+create or replace function public.delete_post(p_id bigint, p_reason text default null)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_post public.posts;
+begin
+  select * into v_post from public.posts where id = p_id;
+  if not found then return; end if;
+  if v_post.author_id <> auth.uid() then
+    perform public.require_admin(array['super_admin', 'user_admin']);
+    perform public.write_audit(auth.uid(), 'post.delete', p_id::text, to_jsonb(v_post), null, p_reason);
+  end if;
+  delete from public.posts where id = p_id;
+end;
+$$;
+
+-- p_scope: 'connections' (you and your connections) or 'all' (super admin only).
+-- For the founder, 'connections' leaves out the automatic links, so it means the people they chose.
+create or replace function public.feed(p_scope text default 'connections', p_before timestamptz default null, p_limit integer default 20)
+returns jsonb
+language plpgsql stable
+security definer set search_path = ''
+as $$
+declare
+  v_me uuid := auth.uid();
+  v_role text := public.admin_role();
+  v_founder uuid := (select user_id from public.admins where role = 'super_admin');
+begin
+  if v_me is null then raise exception 'Please sign in first.'; end if;
+  if p_scope not in ('connections', 'all') then raise exception 'Unknown feed.'; end if;
+  if p_scope = 'all' and v_role is distinct from 'super_admin' then
+    raise exception 'Only the super admin can see every member''s posts.' using errcode = '42501';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', p.id, 'body', p.body, 'niche', p.niche, 'createdAt', p.created_at, 'mine', p.author_id = v_me,
+             'author', jsonb_build_object('id', m.id, 'name', m.display_name, 'headline', m.headline, 'avatar', m.avatar_url,
+                                          'isFounder', m.id = v_founder))
+           order by p.created_at desc)
+    from (
+      select * from public.posts p
+      where (p_before is null or p.created_at < p_before)
+        and (p_scope = 'all' or p.author_id = v_me or exists (
+          select 1 from public.connections c
+          where c.user_a = least(v_me, p.author_id) and c.user_b = greatest(v_me, p.author_id)
+            and c.status = 'accepted' and not (c.auto and v_role is not distinct from 'super_admin')))
+      order by p.created_at desc
+      limit least(greatest(coalesce(p_limit, 20), 1), 50)
+    ) p
+    join public.member_profiles m on m.id = p.author_id), '[]');
+end;
+$$;
+
+revoke all on function public.create_post(text, text), public.delete_post(bigint, text),
+  public.feed(text, timestamptz, integer) from public, anon;
+
+-- =====================================================================================
+-- 14. Backup recovery. The backup email can ask to take over as super admin; it happens only after
+--     72 hours, and the super admin (or the backup) can cancel it in the meantime.
+create table if not exists public.admin_recovery (
+  id boolean primary key default true check (id),
+  backup_email text check (backup_email is null or backup_email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  requested_at timestamptz,
+  requested_by uuid references auth.users (id) on delete set null
+);
+insert into public.admin_recovery (id) values (true) on conflict do nothing;
+alter table public.admin_recovery enable row level security;
+-- No policies: read and changed through the functions below.
+
+create or replace function public.save_backup_email(p_email text, p_super_admin_email text)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if lower(trim(p_email)) = lower(trim(p_super_admin_email)) then
+    raise exception 'The backup must be a different email from the super admin''s.';
+  end if;
+  update public.admin_recovery set backup_email = lower(trim(p_email)), requested_at = null, requested_by = null;
+end;
+$$;
+revoke all on function public.save_backup_email(text, text) from public, anon, authenticated, service_role;
+
+create or replace function public.recovery_status()
+returns jsonb
+language plpgsql stable
+security definer set search_path = ''
+as $$
+declare
+  v_rec public.admin_recovery;
+  v_email text := (select lower(email) from auth.users where id = auth.uid());
+  v_effective timestamptz;
+begin
+  select * into v_rec from public.admin_recovery;
+  v_effective := v_rec.requested_at + interval '72 hours';
+  if public.admin_role() = 'super_admin' then
+    return jsonb_build_object('as', 'super_admin', 'backupEmail', v_rec.backup_email,
+                              'requestedAt', v_rec.requested_at, 'effectiveAt', v_effective);
+  end if;
+  if v_email is not null and v_email = v_rec.backup_email then
+    return jsonb_build_object('as', 'backup', 'requestedAt', v_rec.requested_at, 'effectiveAt', v_effective,
+                              'canComplete', v_rec.requested_at is not null and now() >= v_effective);
+  end if;
+  return null;
+end;
+$$;
+
+create or replace function public.admin_set_backup_email(p_email text, p_reason text default null)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_before text := (select backup_email from public.admin_recovery);
+begin
+  perform public.require_admin(array['super_admin']);
+  perform public.save_backup_email(p_email, (select email from auth.users where id = auth.uid()));
+  perform public.write_audit(auth.uid(), 'recovery.set_backup', lower(trim(p_email)),
+    jsonb_build_object('backup', v_before), jsonb_build_object('backup', lower(trim(p_email))), p_reason);
+end;
+$$;
+
+create or replace function public.recovery_request()
+returns timestamptz
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_email text := (select lower(email) from auth.users where id = auth.uid());
+begin
+  if v_email is null or v_email is distinct from (select backup_email from public.admin_recovery) then
+    raise exception 'Only the backup email can ask to take over.' using errcode = '42501';
+  end if;
+  update public.admin_recovery set requested_at = now(), requested_by = auth.uid() where requested_at is null;
+  perform public.write_audit(auth.uid(), 'recovery.request', v_email, null, null, 'Backup asked to take over as super admin');
+  return (select requested_at + interval '72 hours' from public.admin_recovery);
+end;
+$$;
+
+create or replace function public.recovery_cancel(p_reason text default null)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_email text := (select lower(email) from auth.users where id = auth.uid());
+begin
+  if public.admin_role() is distinct from 'super_admin' and v_email is distinct from (select backup_email from public.admin_recovery) then
+    raise exception 'You don''t have permission to do this.' using errcode = '42501';
+  end if;
+  update public.admin_recovery set requested_at = null, requested_by = null;
+  perform public.write_audit(auth.uid(), 'recovery.cancel', v_email, null, null, p_reason);
+end;
+$$;
+
+create or replace function public.recovery_complete()
+returns text
+language plpgsql
+security definer set search_path = ''
+as $$
+declare
+  v_me uuid := auth.uid();
+  v_email text := (select lower(email) from auth.users where id = auth.uid());
+  v_rec public.admin_recovery;
+  v_old uuid := (select user_id from public.admins where role = 'super_admin');
+begin
+  select * into v_rec from public.admin_recovery;
+  if v_email is null or v_email is distinct from v_rec.backup_email then
+    raise exception 'Only the backup email can take over.' using errcode = '42501';
+  end if;
+  if v_rec.requested_at is null then raise exception 'Ask to take over first.'; end if;
+  if now() < v_rec.requested_at + interval '72 hours' then
+    raise exception 'You can take over from %.', to_char(v_rec.requested_at + interval '72 hours', 'DD Mon YYYY HH24:MI "UTC"');
+  end if;
+
+  perform set_config('cxentric.recovery', 'on', true);
+  delete from public.admins where user_id = v_old;
+  delete from public.connections where auto and v_old in (user_a, user_b);
+  perform set_config('cxentric.recovery', 'off', true);
+
+  insert into public.admins (user_id, role, added_by) values (v_me, 'super_admin', v_me)
+  on conflict (user_id) do update set role = 'super_admin';
+  perform public.connect_founder_to_everyone(v_me);
+  update public.admin_recovery set backup_email = null, requested_at = null, requested_by = null;
+
+  perform public.write_audit(v_me, 'recovery.complete', v_email, jsonb_build_object('superAdmin', v_old),
+    jsonb_build_object('superAdmin', v_me), 'Backup took over after 72 hours');
+  return 'You are now the super admin. Set a new backup email in Admin team.';
+end;
+$$;
+
+revoke all on function public.recovery_status(), public.admin_set_backup_email(text, text), public.recovery_request(),
+  public.recovery_cancel(text), public.recovery_complete() from public, anon;

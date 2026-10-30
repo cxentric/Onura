@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import OpenAIWidget from './components/OpenAIWidget/OpenAIWidget';
 import { AnnouncementBanner, MaintenanceScreen } from './components/AppStatus';
+import SignInModal from './components/SignInModal';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
               <AnnouncementBanner />
               <Routes />
               <OpenAIWidget />
+              <SignInModal />
             </Router>
           </MaintenanceScreen>
         </WidgetProvider>
