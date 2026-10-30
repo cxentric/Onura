@@ -17,6 +17,7 @@ let state = {
   proUntil: null,
   subscription: null, // latest Autopay subscription, if any
   role: null, // admin role (super_admin, app_admin, user_admin, member) or null for members
+  linkError: null, // why a sign-in link didn't sign the user in, shown in the sign-in pop-up
 };
 const listeners = new Set();
 const setAuth = (patch) => {
@@ -81,14 +82,27 @@ const hasSavedSession = () => {
 };
 const isAuthRedirect = () => /[?&]code=|access_token=|error_description=/.test(window.location.search + window.location.hash);
 
+// The links only work in the browser that asked for them (PKCE), which is the usual reason they fail.
+const LINK_FAILED = 'That sign-in link didn’t work. Open it in the same browser where you asked for it, or send a new one.';
+
+function linkErrorFromUrl() {
+  const params = new URLSearchParams(`${window.location.search.slice(1)}&${window.location.hash.slice(1)}`);
+  return params.get('error_description');
+}
+
 /** Called once at start-up. */
 export function initAuth() {
   if (!accountsEnabled) return;
-  if (hasSavedSession() || isAuthRedirect()) {
+  const fromLink = isAuthRedirect();
+  const urlError = fromLink ? linkErrorFromUrl() : null;
+  if (hasSavedSession() || fromLink) {
     getSupabase()
       .then((supabase) => supabase.auth.getSession())
-      .then(({ data }) => applySession(data.session))
-      .catch(() => setAuth({ status: 'signed-out' }));
+      .then(({ data }) => {
+        if (fromLink && !data.session) setAuth({ linkError: urlError || LINK_FAILED });
+        return applySession(data.session);
+      })
+      .catch(() => setAuth({ status: 'signed-out', linkError: fromLink ? urlError || LINK_FAILED : null }));
   } else {
     setAuth({ status: 'signed-out' });
   }

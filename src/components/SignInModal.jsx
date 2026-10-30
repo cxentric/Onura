@@ -49,6 +49,11 @@ const SignInModal = () => {
     return () => clearTimeout(timer);
   }, [auth.status]);
 
+  // A sign-in link that failed: reopen the pop-up and say why.
+  useEffect(() => {
+    if (auth.linkError) openSignIn(auth.linkError);
+  }, [auth.linkError]);
+
   // Close once signed in, and on Escape.
   useEffect(() => {
     if (auth.status === 'signed-in' && prompt) closeSignIn();
