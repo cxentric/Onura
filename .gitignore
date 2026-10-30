@@ -14,3 +14,5 @@ vite.config.*s.*
 .dev.vars
 .wrangler/
 /admin/build
+.vercel
+.env*
