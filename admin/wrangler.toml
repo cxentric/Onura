@@ -1,0 +1,4 @@
+# Cloudflare Pages project for the admin console (admin.cxentric.in). Root directory: admin
+name = "cxentric-admin"
+pages_build_output_dir = "build"
+compatibility_date = "2026-10-01"

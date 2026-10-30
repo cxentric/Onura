@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Icon from '../AppIcon';
-import { PLANS, PRO_FEATURES } from '../../config/plans';
+import { plansFrom, proFeatures } from '../../config/plans';
+import { useSettings } from '../../services/appSettings';
 import { isPro, signInWithEmail, signInWithGoogle, signOut, useAuth } from '../../services/auth';
 import { cancelAutopay, upgrade } from '../../services/payments';
 import { useKbStyles } from './kbUi';
@@ -104,7 +105,9 @@ const Plans = ({ s }) => {
     }
   };
 
-  const chosen = PLANS[plan];
+  const settings = useSettings();
+  const plans = plansFrom(settings);
+  const chosen = plans[plan];
   const toggleClass = (on) =>
     `flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
       on ? 'bg-primary text-white' : s.dark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'
@@ -113,7 +116,7 @@ const Plans = ({ s }) => {
   return (
     <div className="space-y-3">
       <ul className="space-y-1">
-        {PRO_FEATURES.map((feature) => (
+        {proFeatures(settings).map((feature) => (
           <li key={feature} className={`flex items-start space-x-2 text-xs ${s.text}`}>
             <Icon name="Check" size={14} className="text-success flex-shrink-0 mt-0.5" />
             <span>{feature}</span>
@@ -132,7 +135,7 @@ const Plans = ({ s }) => {
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        {Object.values(PLANS).map((p) => (
+        {Object.values(plans).map((p) => (
           <button
             key={p.id}
             onClick={() => setPlan(p.id)}

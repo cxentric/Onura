@@ -5,6 +5,7 @@ import { useWidget } from '../../contexts/WidgetContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { activeStreak, dailyDone, useProgress } from '../../services/progressStore';
 import { accountsEnabled, isPro, useAuth } from '../../services/auth';
+import { useSettings } from '../../services/appSettings';
 // Panels (and the knowledge base they use) load only when the assistant is opened.
 const TodayPanel = lazy(() => import('./TodayPanel'));
 const LearnPanel = lazy(() => import('./LearnPanel'));
@@ -19,6 +20,7 @@ const OpenAIWidget = () => {
   const [isLoading, setIsLoading] = useState(false);
   const progress = useProgress();
   const auth = useAuth();
+  const settings = useSettings();
   const pro = isPro(auth);
   const streak = activeStreak(progress);
   const challengePending = !dailyDone(progress);
@@ -38,12 +40,14 @@ const OpenAIWidget = () => {
     { id: 'today', label: 'Today', icon: 'Flame' },
     { id: 'learn', label: 'Learn', icon: 'BookOpen' },
     { id: 'quiz', label: 'Quiz', icon: 'ListChecks' },
-    { id: 'coach', label: 'Coach', icon: 'Bot' },
-    { id: 'hashtags', label: 'Tags', icon: 'Hash' }
-  ];
+    settings.feature_ai_coach && { id: 'coach', label: 'Coach', icon: 'Bot' },
+    settings.feature_hashtags && { id: 'hashtags', label: 'Tags', icon: 'Hash' }
+  ].filter(Boolean);
+  // A tab switched off in the admin console falls back to Today.
+  const currentTab = activeTab === 'account' || tabs.some((t) => t.id === activeTab) ? activeTab : 'today';
 
   const renderActiveTab = () => {
-    switch (activeTab) {
+    switch (currentTab) {
       case 'learn':
         return <LearnPanel />;
       case 'quiz':
@@ -191,7 +195,7 @@ const OpenAIWidget = () => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 flex items-center justify-center space-x-1 py-2 px-1 text-xs font-medium transition-colors ${
-                    activeTab === tab.id
+                    currentTab === tab.id
                       ? theme === 'dark' ? 'bg-gray-700 text-white border-b-2 border-primary' : 'bg-white text-gray-900 border-b-2 border-primary'
                       : theme === 'dark' ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}

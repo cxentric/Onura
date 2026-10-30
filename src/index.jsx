@@ -6,7 +6,9 @@ import "./styles/index.css";
 import { initAuth } from "./services/auth";
 import { initCloudSync } from "./services/cloudSync";
 import { handleOpenRouterReturn } from "./services/aiKeys";
+import { loadAppSettings } from "./services/appSettings";
 
+loadAppSettings();
 handleOpenRouterReturn(); // first: it clears OpenRouter's ?code= before sign-in looks for one
 initCloudSync();
 initAuth();

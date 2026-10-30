@@ -2,6 +2,7 @@
 // Every item can be browsed (Learn mode) or asked as a 4-option multiple-choice question (Quiz mode).
 import industries from './industries';
 import roles from './roles';
+import { cachedKbOverrides } from '../../services/appSettings';
 
 export const DISCLAIMER =
   'Companies are widely recognised leaders in each industry, not an official ranking. Facts reflect public information as of 2025.';
@@ -107,7 +108,56 @@ function buildItems() {
   return items;
 }
 
-export const items = buildItems();
+const TOPIC_IDS = new Set(TOPICS.map((t) => t.id));
+
+/**
+ * Applies edits made in the admin console: 'edit' changes a built-in question's text, 'hide' removes it,
+ * and 'add' appends a custom question that carries its own three wrong options.
+ */
+export function applyOverrides(base, overrides) {
+  const byId = Object.fromEntries(overrides.map((o) => [o.id, o]));
+  const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+  const result = base
+    .filter((item) => byId[item.id]?.kind !== 'hide')
+    .map((item) => {
+      const o = byId[item.id];
+      if (o?.kind !== 'edit') return item;
+      return {
+        ...item,
+        question: text(o.data.question, 300) || item.question,
+        answer: text(o.data.answer, 1000) || item.answer,
+        short: text(o.data.short, 200) || item.short,
+        edited: true,
+      };
+    });
+
+  overrides
+    .filter((o) => o.kind === 'add' && Array.isArray(o.data?.wrong) && o.data.wrong.length === 3)
+    .forEach(({ id, data }) => {
+      const question = text(data.question, 300);
+      const short = text(data.short, 200);
+      if (!question || !short) return;
+      result.push({
+        id,
+        topic: TOPIC_IDS.has(data.topic) ? data.topic : 'careers',
+        industry: industries.some((ind) => ind.id === data.industry) ? data.industry : null,
+        role: roles.some((role) => role.id === data.role) ? data.role : null,
+        company: text(data.company, 80) || null,
+        type: 'custom',
+        question,
+        answer: text(data.answer, 1000) || short,
+        short,
+        wrong: data.wrong.map((w) => text(w, 200)),
+        custom: true,
+      });
+    });
+  return result;
+}
+
+/** The 1,000 questions as shipped, before any admin edits (used by the admin console). */
+export const baseItems = buildItems();
+export const items = applyOverrides(baseItems, cachedKbOverrides());
 export const industryList = industries.map(({ id, name, fullName }) => ({ id, name, fullName }));
 export const roleList = roles.map(({ id, name, shortName }) => ({ id, name, shortName }));
 export const industryById = Object.fromEntries(industries.map((ind) => [ind.id, ind]));
@@ -142,7 +192,7 @@ const shortsByType = items.reduce((acc, item) => {
 /** Four answer options (one correct) for an item, always the same for the same item. */
 export function getQuizOptions(item) {
   const random = seededRandom(item.id);
-  const wrong = shuffle([...shortsByType[item.type]].filter((s) => s !== item.short), random).slice(0, 3);
+  const wrong = item.wrong || shuffle([...shortsByType[item.type]].filter((s) => s !== item.short), random).slice(0, 3);
   const options = shuffle([item.short, ...wrong], random);
   return { options, correctIndex: options.indexOf(item.short) };
 }

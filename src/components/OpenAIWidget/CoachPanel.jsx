@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../AppIcon';
-import { AI_COACH_PRO_ONLY } from '../../config/plans';
+import { useSettings } from '../../services/appSettings';
 import { industryById, itemById, roleById } from '../../data/kb';
 import { PROVIDERS, ask, listModels } from '../../services/aiCoach';
 import {
@@ -145,6 +145,7 @@ const Connect = ({ s, error, connecting }) => {
 const CoachPanel = () => {
   const s = useKbStyles();
   const pro = usePro();
+  const proOnly = useSettings().ai_coach_pro_only;
   const progress = useProgress();
   const { connection, connecting, error } = useAiConnection();
   const [messages, setMessages] = useState([]);
@@ -185,11 +186,11 @@ const CoachPanel = () => {
 
   // A question handed over from another tab (e.g. "Ask AI Coach" on a Learn answer).
   useEffect(() => {
-    if (!connection || (AI_COACH_PRO_ONLY && !pro)) return;
+    if (!connection || (proOnly && !pro)) return;
     const pending = takePendingQuestion();
     if (pending) send(pending);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, pro]);
+  }, [connection, pro, proOnly]);
 
   useEffect(() => {
     if (!connection) return;
@@ -200,7 +201,7 @@ const CoachPanel = () => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, thinking]);
 
-  if (AI_COACH_PRO_ONLY && !pro) {
+  if (proOnly && !pro) {
     return (
       <div className="h-full overflow-y-auto p-3 space-y-3">
         <UpgradeCard

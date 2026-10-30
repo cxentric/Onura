@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import Icon from '../AppIcon';
 import { TOPICS, filterItems, industryList, itemById, pickQuizQuestions } from '../../data/kb';
-import { FREE_RUNS_PER_DAY } from '../../config/plans';
+import { useSettings } from '../../services/appSettings';
 import { countRun, mistakeIds, recordAnswer, runsToday, useProgress } from '../../services/progress';
 import { UpgradeCard, usePro } from './ProGate';
 import { useKbStyles } from './kbUi';
@@ -20,7 +20,8 @@ const QuizPanel = () => {
   const available = useMemo(() => filterItems({ industry, topic }).length, [industry, topic]);
   const mistakes = mistakeIds(progress);
   const pro = usePro();
-  const runsLeft = pro ? Infinity : Math.max(0, FREE_RUNS_PER_DAY - runsToday(progress));
+  const { free_runs_per_day: freeRuns } = useSettings();
+  const runsLeft = pro ? Infinity : Math.max(0, Number(freeRuns) - runsToday(progress));
 
   // Free users get a few practice runs a day; past that, go back to the setup screen, which offers Pro.
   const begin = (nextRun) => {

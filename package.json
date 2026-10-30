@@ -18,7 +18,9 @@
     "start": "vite",
     "build": "vite build --sourcemap",
     "preview": "vite preview",
-    "serve": "node server/index.mjs"
+    "serve": "node server/index.mjs",
+    "admin": "vite --config admin/vite.config.mjs",
+    "admin:build": "vite build --config admin/vite.config.mjs"
   },
   "eslintConfig": {
     "extends": [

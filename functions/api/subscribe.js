@@ -11,7 +11,7 @@ export const onRequestPost = handle(async ({ request, env }) => {
   const subscription = await razorpay(env, '/subscriptions', {
     method: 'POST',
     body: JSON.stringify({
-      plan_id: razorpayPlanId(env, plan),
+      plan_id: await razorpayPlanId(env, plan),
       total_count: CYCLES[plan.id],
       customer_notify: 1,
       notes: { user_id: user.id, plan: plan.id },

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../AppIcon';
 import { DAILY_SIZE, industryById, industryList, itemById, roleById, roleList } from '../../data/kb';
-import { FREE_RUNS_PER_DAY } from '../../config/plans';
+import { useSettings } from '../../services/appSettings';
 import {
   activeStreak,
   countRun,
@@ -113,7 +113,8 @@ const TodayPanel = () => {
 
   const pro = usePro();
   const { setActiveTab } = useWidget();
-  const canRevise = pro || runsToday(progress) < FREE_RUNS_PER_DAY;
+  const settings = useSettings();
+  const canRevise = pro || runsToday(progress) < Number(settings.free_runs_per_day);
 
   const shareBadge = async () => {
     if (!pro) {
@@ -226,10 +227,12 @@ const TodayPanel = () => {
                 <Icon name="Pencil" size={11} />
                 <span>Change goal</span>
               </button>
-              <button onClick={shareBadge} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
-                <Icon name={pro ? 'Share2' : 'Crown'} size={11} />
-                <span>Share badge</span>
-              </button>
+              {settings.feature_share_badge && (
+                <button onClick={shareBadge} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+                  <Icon name={pro ? 'Share2' : 'Crown'} size={11} />
+                  <span>Share badge</span>
+                </button>
+              )}
             </div>
             {shareNote && <p className="text-[10px] mt-1 text-success-600">{shareNote}</p>}
           </div>

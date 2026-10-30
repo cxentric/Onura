@@ -13,3 +13,4 @@ vite.config.*s.*
 # Cloudflare local secrets
 .dev.vars
 .wrangler/
+/admin/build

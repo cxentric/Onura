@@ -6,6 +6,8 @@ import ProfileBio from './components/ProfileBio';
 import ProfileTabs from './components/ProfileTabs';
 import PostsGrid from './components/PostsGrid';
 import ConnectionsList from './components/ConnectionsList';
+import MyNetwork from './components/MyNetwork';
+import { accountsEnabled } from '../../services/auth';
 import ProfileSettings from './components/ProfileSettings';
 import AIInsights from './components/AIInsights';
 import DocumentsTab from './components/DocumentsTab';
@@ -346,6 +348,8 @@ const ProfileManagement = () => {
       case 'posts':
         return <PostsGrid posts={posts} />;
       case 'connections':
+        // Real connections when accounts are on; the sample list otherwise.
+        if (accountsEnabled) return <MyNetwork />;
         return (
           <ConnectionsList
             connections={connections}

@@ -163,15 +163,67 @@ from another site, add its host there.
 
 ### Plans
 
-Prices and the Free limits are in [`src/config/plans.js`](src/config/plans.js), shared by the app and the API.
-Free: Learn, the daily challenge, streaks and one quiz or revision run a day. Pro (₹149/month or ₹999/year, as UPI
+Prices, the Free limits and feature switches are **settings**, changed in the admin console (below); the defaults
+are in [`src/config/plans.js`](src/config/plans.js) and [`supabase/schema.sql`](supabase/schema.sql). Free: Learn,
+the daily challenge, streaks and one quiz or revision run a day. Pro (₹149/month or ₹999/year by default, as UPI
 Autopay or a one-time pass): unlimited practice, AI Coach, progress sync and the shareable Readiness badge.
+
+A new price applies straight away to one-time passes. Razorpay Autopay plans have a fixed amount, so for Autopay
+create new plans in Razorpay at the new price and put their ids in the `razorpay_plan_monthly` /
+`razorpay_plan_yearly` settings. Existing Autopay members stay on their old plan.
 
 ### AI Coach
 
 Pro users connect their own AI: a Claude, ChatGPT or Gemini API key, or an OpenRouter account. The key stays in
 their browser and goes only to that provider, so CXentric stores no keys and pays nothing for AI. The coach is
-told the learner's goal, Readiness Score and missed questions. Set `AI_COACH_PRO_ONLY` to `false` to offer it to everyone.
+told the learner's goal, Readiness Score and missed questions. Turn off the `ai_coach_pro_only` setting to offer
+it to everyone, or `feature_ai_coach` to hide it.
+
+### Admin console (admin.cxentric.in)
+
+A separate app in [`admin/`](admin) for the founder and the admin team: members and their plans, subscriptions
+and payments, app settings (prices, limits, feature switches, announcement banner, maintenance mode), the
+question bank, the admin team and an audit log. Every change asks for a reason and is written to the audit log,
+which nobody can edit or delete. The database enforces the roles, so the console can't do more than a role allows.
+
+| Role | Can |
+| --- | --- |
+| **Super admin** (one person, the founder) | everything, including billing settings and the admin team |
+| **App admin** | settings, feature switches, banner and maintenance mode, question bank |
+| **User admin** | give or end Pro, cancel Autopay, block or unblock accounts |
+| **Member** | read only; emails are partly hidden |
+
+The founder is connected to every member automatically, and members can't remove that connection.
+
+Setup:
+
+1. Re-run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor.
+2. Sign in to CXentric once with the founder's account, then in the SQL Editor run (once, with that email):
+   ```sql
+   select public.make_super_admin('founder@example.com');
+   ```
+   This makes that account the super admin and connects it to every existing member. It refuses if there is
+   already a super admin, and nobody can change or remove the super admin, not even from the SQL Editor. To hand
+   over in future, run in the SQL Editor:
+   ```sql
+   alter table public.admins disable trigger protect_super_admin;
+   delete from public.admins where role = 'super_admin';
+   alter table public.admins enable trigger protect_super_admin;
+   select public.make_super_admin('new-founder@example.com');
+   ```
+3. Supabase → **Authentication → URL Configuration**: add the redirect URL `https://admin.cxentric.in/**`
+   (and `http://localhost:4029/**` for local work).
+4. Cloudflare → create a second Pages project from `cxentric/Onura`:
+   - Root directory `admin`; build command `cd .. && npm ci && npm run admin:build`; output directory `build`.
+   - Variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+     (secret), `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` (secrets).
+   - Custom domain `admin.cxentric.in`.
+5. Recommended: put **Cloudflare Zero Trust → Access** in front of `admin.cxentric.in` and allow only the admin
+   team's emails, so the console isn't reachable by anyone else at all.
+6. Add others from **Admin team** in the console. They must have signed in to CXentric once.
+
+Run it locally with `npm run admin` (port 4029). Update the privacy policy to say that the admin team can see
+account and plan details and that every member is connected to the founder (India's DPDP Act asks for this).
 
 ## 🙏 Acknowledgments
 

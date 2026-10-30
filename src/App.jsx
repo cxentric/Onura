@@ -6,17 +6,21 @@ import Routes from './Routes';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import OpenAIWidget from './components/OpenAIWidget/OpenAIWidget';
+import { AnnouncementBanner, MaintenanceScreen } from './components/AppStatus';
 
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <WidgetProvider>
-          <Router>
-            <ScrollToTop />
-            <Routes />
-            <OpenAIWidget />
-          </Router>
+          <MaintenanceScreen>
+            <Router>
+              <ScrollToTop />
+              <AnnouncementBanner />
+              <Routes />
+              <OpenAIWidget />
+            </Router>
+          </MaintenanceScreen>
         </WidgetProvider>
       </ThemeProvider>
     </ErrorBoundary>
