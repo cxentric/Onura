@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../AppIcon';
 import { useSettings } from '../../services/appSettings';
 import { industryById, itemById, roleById } from '../../data/kb';
-import { PROVIDERS, ask, listModels } from '../../services/aiCoach';
+import { PROVIDERS, ask, listModels, providerOfKey } from '../../services/aiCoach';
+import { useWidget } from '../../contexts/WidgetContext';
 import {
   forgetConnection,
   saveConnection,
@@ -46,21 +47,60 @@ About the learner (from their CXentric progress):
 ${profile}`;
 }
 
-const Connect = ({ s, error, connecting }) => {
+/** Where the coach's answers come from: the user's own AI account and model, not CXentric. */
+const OwnAiNotice = ({ s, label, company, model }) => (
+  <div className={`rounded-md p-2.5 text-[11px] leading-relaxed ${s.dark ? 'bg-gray-700 text-gray-200' : 'bg-blue-50 text-gray-700'}`}>
+    <p className="flex items-center space-x-1 font-semibold">
+      <Icon name="Info" size={12} className="flex-shrink-0 text-primary" />
+      <span>Answers come from your own AI</span>
+    </p>
+    <p className="mt-1">
+      Everything the coach says is written by {label ? `your ${label} account` : 'the AI account you connect'}
+      {model ? `, using the model you picked (${model})` : ', using the model you pick'}. CXentric does not write, check or store
+      these answers, and any usage is billed to you by {company || 'your AI provider'}.
+    </p>
+  </div>
+);
+
+const STEP_NUMBER = 'flex-shrink-0 w-5 h-5 rounded-full bg-primary text-white text-[10px] font-semibold flex items-center justify-center';
+
+const Connect = ({ s, error, connecting, openRouterLocked }) => {
+  const { setActiveTab } = useWidget();
   const [provider, setProvider] = useState('anthropic');
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState(null);
   const info = PROVIDERS[provider];
 
+  // A pasted key that clearly belongs to another of the three AIs switches the choice to match.
+  const takeKey = (value) => {
+    setKey(value);
+    setProblem(null);
+    const detected = providerOfKey(value.trim());
+    if (detected && detected !== 'openrouter') setProvider(detected);
+  };
+
+  const pasteFromClipboard = async () => {
+    try {
+      takeKey((await navigator.clipboard.readText()).trim());
+    } catch {
+      setProblem('Your browser blocked pasting. Click in the box and press Ctrl+V (or long-press and Paste).');
+    }
+  };
+
   const connect = async (e) => {
     e.preventDefault();
+    const trimmed = key.trim();
+    if (providerOfKey(trimmed) === 'openrouter') {
+      setProblem('That is an OpenRouter key. Use "Connect with OpenRouter" below instead.');
+      return;
+    }
     setBusy(true);
     setProblem(null);
     try {
-      const models = await listModels(provider, key.trim());
+      const models = await listModels(provider, trimmed);
       if (!models.length) throw new Error('No chat models are available on that key.');
-      saveConnection({ provider, model: info.defaultModel && models.includes(info.defaultModel) ? info.defaultModel : models[0], key: key.trim() });
+      saveConnection({ provider, model: info.defaultModel && models.includes(info.defaultModel) ? info.defaultModel : models[0], key: trimmed });
     } catch (err) {
       setProblem(err.message);
     } finally {
@@ -77,44 +117,92 @@ const Connect = ({ s, error, connecting }) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="AI provider">
-        {['anthropic', 'openai', 'gemini'].map((id) => (
-          <button
-            key={id}
-            onClick={() => setProvider(id)}
-            aria-pressed={provider === id}
-            className={`py-1.5 rounded-md border text-xs font-medium ${
-              provider === id
-                ? 'border-primary bg-primary text-white'
-                : s.dark ? 'border-gray-600 text-gray-200 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {PROVIDERS[id].label}
-          </button>
-        ))}
+      <OwnAiNotice s={s} />
+
+      <div className="flex items-start space-x-2">
+        <span className={STEP_NUMBER}>1</span>
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-medium ${s.text}`}>Choose your AI</p>
+          <div className="mt-1.5 grid grid-cols-3 gap-1.5" role="group" aria-label="AI provider">
+            {['anthropic', 'openai', 'gemini'].map((id) => (
+              <button
+                key={id}
+                onClick={() => setProvider(id)}
+                aria-pressed={provider === id}
+                className={`py-1.5 rounded-md border text-xs font-medium ${
+                  provider === id
+                    ? 'border-primary bg-primary text-white'
+                    : s.dark ? 'border-gray-600 text-gray-200 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {PROVIDERS[id].label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <form onSubmit={connect} className="space-y-2">
-        <input
-          type="password"
-          required
-          autoComplete="off"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder={`${info.label} API key (${info.keyPlaceholder})`}
-          aria-label={`${info.label} API key`}
-          className={s.select}
-        />
-        <button type="submit" disabled={busy} className="w-full py-2 rounded-md bg-primary text-white text-xs font-semibold hover:bg-primary-700 disabled:opacity-60">
-          {busy ? 'Checking key…' : `Connect ${info.label}`}
-        </button>
+      <div className="flex items-start space-x-2">
+        <span className={STEP_NUMBER}>2</span>
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-medium ${s.text}`}>Get your {info.label} key</p>
+          <a
+            href={info.keyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={`mt-1.5 w-full flex items-center justify-center space-x-1.5 py-2 rounded-md border text-xs font-medium ${
+              s.dark ? 'border-gray-600 text-gray-100 hover:bg-gray-700' : 'border-gray-300 text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <span>Open {info.company} key page</span>
+            <Icon name="ExternalLink" size={12} />
+          </a>
+          <p className={`text-[11px] mt-1 ${s.muted}`}>{info.keySteps} Then come back to this tab.</p>
+        </div>
+      </div>
+
+      <form onSubmit={connect} className="flex items-start space-x-2">
+        <span className={STEP_NUMBER}>3</span>
+        <div className="flex-1 min-w-0 space-y-2">
+          <p className={`text-xs font-medium ${s.text}`}>Paste your key here</p>
+          <div className="flex space-x-1.5">
+            <input
+              type="password"
+              required
+              autoComplete="off"
+              value={key}
+              onChange={(e) => takeKey(e.target.value)}
+              placeholder={`${info.label} API key (${info.keyPlaceholder})`}
+              aria-label={`${info.label} API key`}
+              className={s.select}
+            />
+            {navigator.clipboard?.readText && (
+              <button
+                type="button"
+                onClick={pasteFromClipboard}
+                className={`flex-shrink-0 px-2.5 rounded-md border text-xs font-medium ${
+                  s.dark ? 'border-gray-600 text-gray-100 hover:bg-gray-700' : 'border-gray-300 text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                Paste
+              </button>
+            )}
+          </div>
+          <button type="submit" disabled={busy} className="w-full py-2 rounded-md bg-primary text-white text-xs font-semibold hover:bg-primary-700 disabled:opacity-60">
+            {busy ? 'Checking key…' : `Connect ${info.label}`}
+          </button>
+        </div>
       </form>
+
+      {(problem || error) && <p className="text-xs text-error">{problem || error}</p>}
+
       <p className={`text-[11px] ${s.muted}`}>
-        Get a key from{' '}
-        <a href={info.keyUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-          {info.company}
-        </a>
-        . An API key is billed by the provider, separately from a ChatGPT Plus, Claude Pro or Gemini subscription; a short coaching chat usually costs about a rupee or less.
+        An API key is billed by {info.company} for what you use, separately from a ChatGPT Plus, Claude Pro or Gemini subscription.
+        A short coaching chat usually costs about a rupee or less.
+      </p>
+      <p className={`text-[10px] flex items-start space-x-1 ${s.muted}`}>
+        <Icon name="Lock" size={11} className="flex-shrink-0 mt-px" />
+        <span>Your key is stored only in this browser and sent only to {info.company}. CXentric never sees it.</span>
       </p>
 
       <div className={`flex items-center space-x-2 text-[10px] ${s.muted}`}>
@@ -123,21 +211,15 @@ const Connect = ({ s, error, connecting }) => {
         <span className={`flex-1 h-px ${s.dark ? 'bg-gray-600' : 'bg-gray-200'}`} />
       </div>
       <button
-        onClick={startOpenRouterConnect}
+        onClick={openRouterLocked ? () => setActiveTab('account') : startOpenRouterConnect}
         disabled={connecting}
         className={`w-full flex items-center justify-center space-x-2 py-2 rounded-md border text-xs font-medium disabled:opacity-60 ${
           s.dark ? 'border-gray-600 text-gray-100 hover:bg-gray-700' : 'border-gray-300 text-gray-800 hover:bg-gray-50'
         }`}
       >
-        <Icon name="Link" size={14} />
-        <span>{connecting ? 'Connecting OpenRouter…' : 'Connect with OpenRouter'}</span>
+        <Icon name={openRouterLocked ? 'Crown' : 'Link'} size={14} className={openRouterLocked ? 'text-amber-500' : ''} />
+        <span>{connecting ? 'Connecting OpenRouter…' : openRouterLocked ? 'Connect with OpenRouter · Pro' : 'Connect with OpenRouter'}</span>
       </button>
-
-      {(problem || error) && <p className="text-xs text-error">{problem || error}</p>}
-      <p className={`text-[10px] flex items-start space-x-1 ${s.muted}`}>
-        <Icon name="Lock" size={11} className="flex-shrink-0 mt-px" />
-        <span>Your key is stored only in this browser and sent only to {info.company === 'any model' ? 'OpenRouter' : info.company}. CXentric never sees it.</span>
-      </p>
     </div>
   );
 };
@@ -145,7 +227,9 @@ const Connect = ({ s, error, connecting }) => {
 const CoachPanel = () => {
   const s = useKbStyles();
   const pro = usePro();
-  const proOnly = useSettings().ai_coach_pro_only;
+  const settings = useSettings();
+  const proOnly = settings.ai_coach_pro_only;
+  const openRouterLocked = settings.openrouter_pro_only && !pro;
   const progress = useProgress();
   const { connection, connecting, error } = useAiConnection();
   const [messages, setMessages] = useState([]);
@@ -168,14 +252,14 @@ const CoachPanel = () => {
 
   const send = async (text) => {
     const question = text.trim();
-    if (!question || thinking || !connection) return;
+    if (!question || thinking || !usable) return;
     const next = [...messages, { role: 'user', content: question }];
     setMessages(next);
     setInput('');
     setThinking(true);
     setProblem(null);
     try {
-      const reply = await ask(connection, buildSystemPrompt(progress), next.slice(-HISTORY_TURNS));
+      const reply = await ask(usable, buildSystemPrompt(progress), next.slice(-HISTORY_TURNS));
       setMessages((m) => [...m, { role: 'assistant', content: reply }]);
     } catch (err) {
       setProblem(err.message);
@@ -184,13 +268,16 @@ const CoachPanel = () => {
     }
   };
 
+  // An OpenRouter connection only counts while the user may use OpenRouter (it is Pro-only).
+  const usable = connection && !(connection.provider === 'openrouter' && openRouterLocked) ? connection : null;
+
   // A question handed over from another tab (e.g. "Ask AI Coach" on a Learn answer).
   useEffect(() => {
-    if (!connection || (proOnly && !pro)) return;
+    if (!usable || (proOnly && !pro)) return;
     const pending = takePendingQuestion();
     if (pending) send(pending);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, pro, proOnly]);
+  }, [usable, pro, proOnly]);
 
   useEffect(() => {
     if (!connection) return;
@@ -198,7 +285,8 @@ const CoachPanel = () => {
   }, [connection?.provider, connection?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    // Not on an empty chat, so the "answers come from your own AI" notice stays in view.
+    if (messages.length || thinking) endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, thinking]);
 
   if (proOnly && !pro) {
@@ -212,7 +300,16 @@ const CoachPanel = () => {
     );
   }
 
-  if (!connection) return <Connect s={s} error={error} connecting={connecting} />;
+  if (!usable) {
+    return (
+      <Connect
+        s={s}
+        error={error || (connection ? 'OpenRouter is a Pro feature. Upgrade, or connect your own Claude, ChatGPT or Gemini key.' : null)}
+        connecting={connecting}
+        openRouterLocked={openRouterLocked}
+      />
+    );
+  }
 
   const provider = PROVIDERS[connection.provider];
   const modelOptions = models.includes(connection.model) ? models : [connection.model, ...models];
@@ -246,6 +343,7 @@ const CoachPanel = () => {
       <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 && (
           <div className="space-y-2">
+            <OwnAiNotice s={s} label={provider.label} company={provider.company === 'any model' ? 'OpenRouter' : provider.company} model={connection.model} />
             <p className={`text-xs ${s.muted}`}>Ask anything about your career prep. Try:</p>
             {suggestions.map((text) => (
               <button key={text} onClick={() => send(text)} className={`${s.rowButton} flex items-start space-x-2`}>
@@ -254,6 +352,11 @@ const CoachPanel = () => {
               </button>
             ))}
           </div>
+        )}
+        {messages.length > 0 && (
+          <p className={`text-[10px] text-center ${s.muted}`}>
+            Answers by your {provider.label} account · {connection.model}
+          </p>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>

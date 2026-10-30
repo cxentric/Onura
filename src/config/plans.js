@@ -24,7 +24,8 @@ export function proFeatures(settings) {
   const runs = Number(settings.free_runs_per_day);
   return [
     `Unlimited quizzes and revision (Free: ${runs} a day)`,
-    settings.feature_ai_coach && 'AI Coach with your own ChatGPT, Claude or Gemini',
+    settings.feature_ai_coach && settings.ai_coach_pro_only && 'AI Coach with your own ChatGPT, Claude or Gemini',
+    settings.feature_ai_coach && settings.openrouter_pro_only && 'AI Coach with OpenRouter: every AI model, one sign-in',
     'Progress synced across your devices',
     settings.feature_share_badge && 'Shareable Readiness badge',
   ].filter(Boolean);

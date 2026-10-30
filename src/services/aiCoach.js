@@ -9,6 +9,7 @@ export const PROVIDERS = {
     company: 'Anthropic',
     keyUrl: 'https://console.anthropic.com/settings/keys',
     keyPlaceholder: 'sk-ant-…',
+    keySteps: 'Sign in, click "Create Key", name it CXentric, then copy the key.',
     defaultModel: 'claude-opus-5-5',
   },
   openai: {
@@ -16,12 +17,14 @@ export const PROVIDERS = {
     company: 'OpenAI',
     keyUrl: 'https://platform.openai.com/api-keys',
     keyPlaceholder: 'sk-…',
+    keySteps: 'Sign in, click "Create new secret key", name it CXentric, then copy the key.',
   },
   gemini: {
     label: 'Gemini',
     company: 'Google',
     keyUrl: 'https://aistudio.google.com/apikey',
     keyPlaceholder: 'AIza…',
+    keySteps: 'Sign in with Google, click "Create API key", then copy the key.',
   },
   openrouter: {
     label: 'OpenRouter',
@@ -31,6 +34,15 @@ export const PROVIDERS = {
     defaultModel: 'openrouter/auto',
   },
 };
+
+/** Which provider a pasted key belongs to, from its prefix (null when it can't tell). */
+export function providerOfKey(key) {
+  if (key.startsWith('sk-ant-')) return 'anthropic';
+  if (key.startsWith('sk-or-')) return 'openrouter';
+  if (key.startsWith('AIza')) return 'gemini';
+  if (key.startsWith('sk-')) return 'openai';
+  return null;
+}
 
 const CLAUDE_MODELS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
 // Models that accept server-side refusal fallbacks (re-run on another model if a request is declined).
