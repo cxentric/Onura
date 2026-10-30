@@ -27,6 +27,6 @@ export function proFeatures(settings) {
     settings.feature_ai_coach && settings.ai_coach_pro_only && 'AI Coach with your own ChatGPT, Claude or Gemini',
     settings.feature_ai_coach && settings.openrouter_pro_only && 'AI Coach with OpenRouter: every AI model, one sign-in',
     'Progress synced across your devices',
-    settings.feature_share_badge && 'Shareable Readiness badge',
+    settings.feature_share_badge && 'Shareable Prep badge',
   ].filter(Boolean);
 }

@@ -8,45 +8,49 @@ import {
   dailyDone,
   ensureDailyChallenge,
   mistakeIds,
+  dismissInterviewPrompt,
+  markInterviewPromptShown,
   readiness,
   recordAnswer,
   recordDailyAnswer,
   runsToday,
   setGoal,
+  shouldPromptInterview,
   useProgress,
 } from '../../services/progress';
+import { LEVELS, SCOPE_NOTE, levelAtLeast, prepScore } from '../../services/prepScore';
+import { askCoach } from '../../services/aiKeys';
 import { usePro } from './ProGate';
 import { useWidget } from '../../contexts/WidgetContext';
 import { useKbStyles } from './kbUi';
-import { shareReadinessBadge } from './shareBadge';
+import { sharePrepBadge } from './shareBadge';
 import QuizRunner from './QuizRunner';
+import InterviewCheckIn from './InterviewCheckIn';
 
-const MILESTONES = [25, 50, 75, 100];
-
-const ReadinessRing = ({ percent, dark }) => {
-  const radius = 26;
-  const circumference = 2 * Math.PI * radius;
-  return (
-    <svg width="68" height="68" viewBox="0 0 68 68" role="img" aria-label={`${percent}% ready`}>
-      <circle cx="34" cy="34" r={radius} fill="none" strokeWidth="7" className={dark ? 'stroke-gray-600' : 'stroke-gray-200'} />
-      <circle
-        cx="34"
-        cy="34"
-        r={radius}
-        fill="none"
-        strokeWidth="7"
-        strokeLinecap="round"
-        className="stroke-primary transition-all duration-700"
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - percent / 100)}
-        transform="rotate(-90 34 34)"
-      />
-      <text x="34" y="38" textAnchor="middle" className={`text-[13px] font-bold ${dark ? 'fill-white' : 'fill-gray-800'}`}>
-        {percent}%
-      </text>
-    </svg>
-  );
-};
+/** Progress bar with a tick at each level (25 / 50 / 75 / 100). */
+const PrepBar = ({ score, dark }) => (
+  <div className="flex items-center space-x-2">
+    <div
+      className={`relative flex-1 h-2 rounded-full ${dark ? 'bg-gray-600' : 'bg-gray-200'}`}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={score.total}
+      aria-valuenow={score.correct}
+      aria-valuetext={`${score.correct} of ${score.total} topics mastered`}
+    >
+      <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-700" style={{ width: `${score.pct}%` }} />
+      {LEVELS.filter((l) => l.min > 0).map((l) => (
+        <span
+          key={l.key}
+          className="absolute -top-0.5 w-px h-3 bg-gray-400"
+          style={{ left: `calc(${l.min}% - ${l.min === 100 ? 1 : 0}px)` }}
+          title={l.label}
+        />
+      ))}
+    </div>
+    <span className={`text-[10px] tabular-nums ${dark ? 'text-gray-400' : 'text-gray-500'}`}>{score.pct}%</span>
+  </div>
+);
 
 const GoalPicker = ({ goal, onDone, s }) => {
   const [industry, setIndustry] = useState(goal?.industry || 'it');
@@ -57,7 +61,7 @@ const GoalPicker = ({ goal, onDone, s }) => {
         <Icon name="Target" size={16} className="text-primary" />
         <h3 className={`text-sm font-semibold ${s.text}`}>{goal ? 'Change your goal' : 'Set your career goal'}</h3>
       </div>
-      <p className={`text-xs ${s.muted}`}>Pick the role you’re preparing for. Daily questions and your Readiness Score follow it.</p>
+      <p className={`text-xs ${s.muted}`}>Pick the role you’re preparing for. Daily questions and your Prep Score follow it.</p>
       <div className="grid grid-cols-2 gap-2">
         <select aria-label="Goal role" value={role} onChange={(e) => setRole(e.target.value)} className={s.select}>
           {roleList.map((r) => (
@@ -97,6 +101,7 @@ const TodayPanel = () => {
   const [run, setRun] = useState(null); // 'daily' | 'review'
   const [runKey, setRunKey] = useState(0);
   const [shareNote, setShareNote] = useState(null);
+  const [checkingIn, setCheckingIn] = useState(false);
 
   useEffect(() => {
     ensureDailyChallenge();
@@ -108,21 +113,32 @@ const TodayPanel = () => {
   const mistakes = mistakeIds(progress);
   const { daily, goal } = progress;
   const answeredToday = daily.ids.filter((id) => id in daily.answers).length;
-  const nextMilestone = MILESTONES.find((m) => m > ready.percent);
-  const toNextMilestone = nextMilestone ? Math.ceil((nextMilestone / 100) * ready.total) - ready.mastered : 0;
+  const score = prepScore(ready.mastered, ready.total);
+  const goalName = goal && `${roleById[goal.role].shortName} · ${industryById[goal.industry].name}`;
+  const showInterviewPrompt = !editingGoal && shouldPromptInterview(progress, levelAtLeast(score, 'foundation'));
 
   const pro = usePro();
   const { setActiveTab } = useWidget();
   const settings = useSettings();
   const canRevise = pro || runsToday(progress) < Number(settings.free_runs_per_day);
 
+  useEffect(() => {
+    if (showInterviewPrompt) markInterviewPromptShown();
+  }, [showInterviewPrompt]);
+
+  // The Coach tab decides what a Free user sees (the key steps, or the upgrade card when it's Pro-only).
+  const practiseMockInterview = () => {
+    askCoach(`Run a mock interview with me for a ${roleById[goal.role].name} role in ${industryById[goal.industry].name}. Ask one question at a time and give me feedback on each answer.`);
+    setActiveTab('coach');
+  };
+
   const shareBadge = async () => {
     if (!pro) {
       setActiveTab('account');
       return;
     }
-    const result = await shareReadinessBadge({
-      percent: ready.percent,
+    const result = await sharePrepBadge({
+      score,
       role: roleById[goal.role].name,
       industry: industryById[goal.industry].name,
       streak,
@@ -142,6 +158,8 @@ const TodayPanel = () => {
     setRun(type);
     setRunKey((k) => k + 1);
   };
+
+  if (checkingIn) return <InterviewCheckIn onClose={() => setCheckingIn(false)} />;
 
   if (run === 'daily') {
     const questions = daily.ids.map((id) => itemById[id]).filter(Boolean);
@@ -207,34 +225,74 @@ const TodayPanel = () => {
         </div>
       </div>
 
-      {/* Goal and readiness */}
+      {/* Goal and Prep Score: knowledge coverage of the goal's questions, never a prediction */}
       {!goal || editingGoal ? (
         <GoalPicker goal={goal} onDone={() => setEditingGoal(false)} s={s} />
       ) : (
-        <div className={`${s.card} p-3 flex items-center space-x-3`}>
-          <ReadinessRing percent={ready.percent} dark={s.dark} />
-          <div className="flex-1 min-w-0">
-            <p className={`text-[10px] uppercase tracking-wide font-medium ${s.muted}`}>Readiness</p>
-            <p className={`text-sm font-semibold leading-snug ${s.text}`}>
-              {roleById[goal.role].shortName} in {industryById[goal.industry].name}
+        <div className={`${s.card} p-3 space-y-2`}>
+          <div>
+            <p className={`text-[10px] uppercase tracking-wide font-medium ${s.muted}`}>Prep Score · {goalName}</p>
+            <p className={`text-lg font-bold leading-tight ${s.text}`}>{score.level.label}</p>
+          </div>
+          <PrepBar score={score} dark={s.dark} />
+          <div>
+            <p className={`text-xs ${s.text}`}>
+              {score.correct} of {score.total} {goalName} topics mastered
             </p>
-            <p className={`text-[11px] ${s.muted}`}>
-              {ready.mastered} of {ready.total} mastered
-              {nextMilestone ? ` · ${toNextMilestone} more to ${nextMilestone}%` : ' · Fully ready!'}
-            </p>
-            <div className="mt-1 flex items-center space-x-3">
-              <button onClick={() => setEditingGoal(true)} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
-                <Icon name="Pencil" size={11} />
-                <span>Change goal</span>
+            {score.next && (
+              <p className={`text-[11px] ${s.muted}`}>
+                {score.toNext} more to reach <span className="italic">{score.next.label}</span>
+              </p>
+            )}
+          </div>
+          <p className={`text-[10px] leading-snug ${s.muted}`}>{SCOPE_NOTE}</p>
+          {settings.feature_ai_coach && levelAtLeast(score, 'practice') && (
+            <button
+              onClick={practiseMockInterview}
+              className="w-full flex items-center justify-center space-x-1.5 py-2 rounded-md bg-primary text-white text-xs font-semibold hover:bg-primary-700"
+            >
+              <Icon name="Bot" size={14} />
+              <span>Practise a mock interview with AI Coach</span>
+            </button>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button onClick={() => setEditingGoal(true)} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+              <Icon name="Pencil" size={11} />
+              <span>Change goal</span>
+            </button>
+            {settings.feature_share_badge && (
+              <button onClick={shareBadge} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+                <Icon name={pro ? 'Share2' : 'Crown'} size={11} />
+                <span>Share badge</span>
               </button>
-              {settings.feature_share_badge && (
-                <button onClick={shareBadge} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
-                  <Icon name={pro ? 'Share2' : 'Crown'} size={11} />
-                  <span>Share badge</span>
-                </button>
-              )}
+            )}
+            <button onClick={() => setCheckingIn(true)} className="flex items-center space-x-1 text-[11px] font-medium text-primary hover:underline">
+              <Icon name="MessageSquare" size={11} />
+              <span>Had an interview? Tell us how it went</span>
+            </button>
+          </div>
+          {shareNote && <p className="text-[10px] text-success-600">{shareNote}</p>}
+        </div>
+      )}
+
+      {showInterviewPrompt && (
+        <div className={`${s.card} p-3`}>
+          <div className="flex items-start justify-between space-x-2">
+            <div>
+              <p className={`text-xs font-semibold ${s.text}`}>Had an interview lately?</p>
+              <p className={`text-[11px] mt-0.5 ${s.muted}`}>Tell us how it went. It takes a minute and stays with your progress.</p>
             </div>
-            {shareNote && <p className="text-[10px] mt-1 text-success-600">{shareNote}</p>}
+            <button onClick={() => dismissInterviewPrompt(false)} aria-label="Not now" className={s.muted}>
+              <Icon name="X" size={14} />
+            </button>
+          </div>
+          <div className="mt-2 flex items-center space-x-3">
+            <button onClick={() => setCheckingIn(true)} className="px-3 py-1.5 rounded-md bg-primary text-white text-[11px] font-medium hover:bg-primary-700">
+              Tell us how it went
+            </button>
+            <button onClick={() => dismissInterviewPrompt(true)} className={`text-[11px] ${s.muted} hover:underline`}>
+              Don’t ask again
+            </button>
           </div>
         </div>
       )}
@@ -282,7 +340,7 @@ const TodayPanel = () => {
           <div className="flex-1">
             <p className={`text-xs font-semibold ${s.text}`}>Revise {Math.min(mistakes.length, 10)} missed question{mistakes.length === 1 ? '' : 's'}</p>
             <p className={`text-[10px] ${s.muted}`}>
-              {canRevise ? 'Get them right to raise your Readiness Score.' : 'Free practice used today. Tap to see Pro.'}
+              {canRevise ? 'Get them right to raise your Prep Score.' : 'Free practice used today. Tap to see Pro.'}
             </p>
           </div>
           <Icon name={canRevise ? 'ChevronRight' : 'Crown'} size={16} className={canRevise ? s.muted : 'text-amber-500'} />

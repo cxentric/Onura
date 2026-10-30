@@ -1,5 +1,5 @@
 /**
- * Learner progress actions and knowledge-base-aware values (readiness, daily challenge).
+ * Learner progress actions and knowledge-base-aware values (readiness, daily challenge, interviews).
  * State lives in progressStore.js, in the browser.
  */
 import { buildDailyChallenge, goalItems } from '../data/kb';
@@ -86,6 +86,64 @@ export function recordDailyAnswer(id, correct) {
 export function countRun() {
   const today = dateKey();
   setState((s) => ({ ...s, runs: { date: today, count: (s.runs.date === today ? s.runs.count : 0) + 1 } }));
+}
+
+// ---- Interview check-ins ("How did your interview go?") ----
+
+export const INTERVIEW_RESULTS = [
+  { id: 'offer', label: 'Offer' },
+  { id: 'rejected', label: 'Rejected' },
+  { id: 'waiting', label: 'Still waiting' },
+  { id: 'no_reply', label: 'Didn’t hear back' },
+];
+export const MAX_ASKED_LENGTH = 1000;
+const PROMPT_GAP_DAYS = 7;
+
+export const goalKey = (goal) => (goal ? `${goal.role}:${goal.industry}` : null);
+
+/** @param {{ result: string, company?: string, date?: string, asked?: string }} entry */
+export function addInterview(entry) {
+  const ready = readiness(storeState);
+  const interview = {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    goal: storeState.goal,
+    result: entry.result,
+    company: entry.company?.trim() || '',
+    date: entry.date || '',
+    asked: (entry.asked || '').trim().slice(0, MAX_ASKED_LENGTH),
+    prepPctAtTime: ready.percent,
+    createdAt: new Date().toISOString(),
+  };
+  setState((s) => ({ ...s, interviews: [interview, ...s.interviews] }));
+  return interview;
+}
+
+/**
+ * The Today-tab nudge: once per goal, after reaching a strong foundation, never more than once a week
+ * across goals, and never again once turned off. It stays up for the rest of the day it first appears.
+ */
+export function shouldPromptInterview(s, reachedFoundation, today = dateKey()) {
+  const key = goalKey(s.goal);
+  const prompt = s.interviewPrompt;
+  if (!key || !reachedFoundation || prompt.off) return false;
+  if (prompt.shown[key]) return prompt.shown[key] === today;
+  return !prompt.lastShown || prompt.lastShown <= shiftDays(today, -PROMPT_GAP_DAYS);
+}
+
+export function markInterviewPromptShown() {
+  const key = goalKey(storeState.goal);
+  const today = dateKey();
+  if (!key || storeState.interviewPrompt.shown[key]) return;
+  setState((s) => ({ ...s, interviewPrompt: { ...s.interviewPrompt, shown: { ...s.interviewPrompt.shown, [key]: today }, lastShown: today } }));
+}
+
+/** Hides the nudge for this goal now; `forGood` stops it for every goal. */
+export function dismissInterviewPrompt(forGood) {
+  const key = goalKey(storeState.goal);
+  setState((s) => ({
+    ...s,
+    interviewPrompt: { ...s.interviewPrompt, shown: { ...s.interviewPrompt.shown, [key]: 'dismissed' }, off: s.interviewPrompt.off || forGood },
+  }));
 }
 
 export function resetProgress() {

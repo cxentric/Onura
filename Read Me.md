@@ -176,7 +176,7 @@ from another site, add its host there.
 Prices, the Free limits and feature switches are **settings**, changed in the admin console (below); the defaults
 are in [`src/config/plans.js`](src/config/plans.js) and [`supabase/schema.sql`](supabase/schema.sql). Free: Learn,
 the daily challenge, streaks and one quiz or revision run a day. Pro (₹149/month or ₹999/year by default, as UPI
-Autopay or a one-time pass): unlimited practice, AI Coach, progress sync and the shareable Readiness badge.
+Autopay or a one-time pass): unlimited practice, AI Coach, progress sync and the shareable Prep badge.
 
 A new price applies straight away to one-time passes. Razorpay Autopay plans have a fixed amount, so for Autopay
 create new plans in Razorpay at the new price and put their ids in the `razorpay_plan_monthly` /
@@ -184,10 +184,25 @@ create new plans in Razorpay at the new price and put their ids in the `razorpay
 
 ### AI Coach
 
-Pro users connect their own AI: a Claude, ChatGPT or Gemini API key, or an OpenRouter account. The key stays in
-their browser and goes only to that provider, so CXentric stores no keys and pays nothing for AI. The coach is
-told the learner's goal, Readiness Score and missed questions. Turn off the `ai_coach_pro_only` setting to offer
-it to everyone, or `feature_ai_coach` to hide it.
+Everyone can connect their own AI with a Claude, ChatGPT or Gemini API key; connecting with an OpenRouter account
+is Pro (`openrouter_pro_only`). The key stays in their browser and goes only to that provider, so CXentric stores no
+keys and pays nothing for AI. The coach is told the learner's goal, Prep Score (and that it measures knowledge
+coverage only), missed questions and recent interview check-ins. Turn on `ai_coach_pro_only` to make the whole
+coach Pro, or turn off `feature_ai_coach` to hide it.
+
+### Prep Score and the copy guard
+
+The Prep Score shows how many of the goal's questions the learner has answered correctly, as a level (Getting
+started, Building, Strong foundation, Ready for mock interviews, Prep track complete). It measures preparation,
+never the chance of being hired, and always says it doesn't cover communication, the CV or live interview skills.
+The levels are in [`src/services/prepScore.js`](src/services/prepScore.js); the stored progress is unchanged.
+
+`npm run lint:copy` (also run before every build) fails if `src/`, `public/` or `index.html` contains an outcome
+promise such as "job-ready", "get hired", "guaranteed", "crack the interview" or "% ready". For a legitimate code
+use, add a `copy-guard-ignore` comment on that line.
+
+"How did your interview go?" check-ins are saved in the learner's progress (`interviews`), on the device and, for
+Pro, in the synced progress row. CXentric doesn't receive them.
 
 ### Admin console (admin.cxentric.in)
 

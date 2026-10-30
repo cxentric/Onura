@@ -15,6 +15,8 @@ export const emptyState = () => ({
   daily: { date: null, ids: [], answers: {} }, // answers: itemId -> correct
   xp: 0,
   runs: { date: null, count: 0 }, // practice runs (quiz or revision) started today; Free has a daily limit
+  interviews: [], // { id, goal, result, company, date, asked, prepPctAtTime, createdAt }, newest first
+  interviewPrompt: { shown: {}, lastShown: null, off: false }, // "How did your interview go?" nudge; shown: goalKey -> date
 });
 
 /** Local calendar date as YYYY-MM-DD (so the day rolls over at the user's midnight). */

@@ -11,7 +11,8 @@ import {
   takePendingQuestion,
   useAiConnection,
 } from '../../services/aiKeys';
-import { mistakeIds, readiness, useProgress } from '../../services/progress';
+import { INTERVIEW_RESULTS, mistakeIds, readiness, useProgress } from '../../services/progress';
+import { prepScore } from '../../services/prepScore';
 import { activeStreak } from '../../services/progressStore';
 import { UpgradeCard, usePro } from './ProGate';
 import { useKbStyles } from './kbUi';
@@ -22,6 +23,7 @@ const HISTORY_TURNS = 12;
 function buildSystemPrompt(progress) {
   const { goal } = progress;
   const ready = readiness(progress);
+  const score = prepScore(ready.mastered, ready.total);
   const missed = mistakeIds(progress)
     .slice(0, 8)
     .map((id) => itemById[id])
@@ -29,16 +31,31 @@ function buildSystemPrompt(progress) {
     .map((item) => `- ${item.question} (correct answer: ${item.short})`)
     .join('\n');
 
+  const interviews = progress.interviews
+    .slice(0, 3)
+    .map((i) => {
+      const result = INTERVIEW_RESULTS.find((r) => r.id === i.result)?.label || i.result;
+      return `- ${result}${i.date ? ` (${i.date})` : ''}${i.asked ? `. They were asked: ${i.asked.slice(0, 400)}` : ''}`;
+    })
+    .join('\n');
+
   const profile = [
     goal
-      ? `Goal: ${roleById[goal.role].name} in ${industryById[goal.industry].name}. Readiness score: ${ready.percent}% (${ready.mastered} of ${ready.total} key questions mastered).`
+      ? `Goal: ${roleById[goal.role].name} in ${industryById[goal.industry].name}.
+Prep Score: ${score.level.label} (${score.correct}/${score.total} goal questions answered correctly).
+This measures knowledge coverage only, not interview performance.
+Never tell the learner they will pass or be hired.`
       : 'Goal: not set yet.',
     `Daily streak: ${activeStreak(progress)} days. XP: ${progress.xp}.`,
     missed ? `Questions they recently got wrong:\n${missed}` : 'No wrong answers recorded yet.',
-  ].join('\n');
+    interviews ? `Interviews they logged in the app (newest first):\n${interviews}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return `You are the AI Career Coach inside CXentric, a career-preparation app for professionals in India.
-Help the learner get job-ready for their goal: explain concepts, plan their preparation, run mock interviews, and give feedback.
+Help the learner prepare for their goal: explain concepts, plan their preparation, run mock interviews, and give feedback.
+Never promise or predict that they will pass an interview or be hired.
 Be warm, specific and practical. Keep answers short enough to read in a small chat panel (about 150-250 words) unless they ask for more.
 Write plain text: short paragraphs and "-" bullet lists. Do not use markdown headings, bold, tables or code blocks.
 When you mention companies, salaries or hiring trends, say they are general guidance and may have changed.
@@ -245,7 +262,7 @@ const CoachPanel = () => {
       'What should I focus on this week?',
       'Explain the questions I got wrong',
       goal ? `Ask me a mock interview question for ${roleById[goal.role].shortName}` : 'Help me choose a career goal',
-      'Make me a 30-day plan to be job-ready',
+      'Make me a 30-day prep plan for my goal',
     ],
     [goal]
   );
@@ -294,7 +311,7 @@ const CoachPanel = () => {
       <div className="h-full overflow-y-auto p-3 space-y-3">
         <UpgradeCard
           title="AI Coach is a Pro feature"
-          text="Bring your own ChatGPT, Claude or Gemini and get coaching that knows your goal, Readiness Score and the questions you missed."
+          text="Bring your own ChatGPT, Claude or Gemini and get coaching that knows your goal, Prep Score and the questions you missed."
         />
       </div>
     );

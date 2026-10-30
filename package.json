@@ -16,6 +16,8 @@
   },
   "scripts": {
     "start": "vite",
+    "lint:copy": "node scripts/check-copy.mjs",
+    "prebuild": "npm run lint:copy",
     "build": "vite build --sourcemap",
     "preview": "vite preview",
     "serve": "node server/index.mjs",

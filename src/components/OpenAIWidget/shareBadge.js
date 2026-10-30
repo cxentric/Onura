@@ -1,10 +1,13 @@
 /**
- * Pro: a Readiness badge image to post on LinkedIn, WhatsApp and so on.
+ * Pro: a Prep badge image to post on LinkedIn, WhatsApp and so on.
+ * It shows effort and coverage (level, topics mastered, streak), never a readiness or hiring claim.
  * Drawn in the browser, then shared with the phone's share sheet, or downloaded on desktop.
  */
-const SITE = 'www.cxentric.in';
+import { LEVELS } from '../../services/prepScore';
 
-function drawBadge({ percent, role, industry, streak }) {
+const SITE = 'cxentric.in';
+
+function drawBadge({ score, role, industry, streak }) {
   const canvas = document.createElement('canvas');
   canvas.width = 1200;
   canvas.height = 628; // LinkedIn's link-image size
@@ -16,52 +19,51 @@ function drawBadge({ percent, role, industry, streak }) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, 1200, 628);
 
-  // Readiness ring
-  const cx = 300, cy = 314, r = 170;
-  ctx.lineWidth = 36;
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = '#FBBF24';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * percent) / 100);
-  ctx.stroke();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 96px system-ui, sans-serif';
-  ctx.fillText(`${percent}%`, cx, cy + 20);
-  ctx.font = '600 30px system-ui, sans-serif';
-  ctx.fillText('job-ready', cx, cy + 66);
-
+  const left = 90, width = 1020;
   ctx.textAlign = 'left';
-  ctx.font = '600 34px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText('My CXentric Readiness Score', 560, 200);
+  ctx.font = '600 34px system-ui, sans-serif';
+  ctx.fillText(`${role} prep track · ${industry}`, left, 150, width);
+
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 56px system-ui, sans-serif';
-  ctx.fillText(role, 560, 280, 600);
-  ctx.font = '500 40px system-ui, sans-serif';
-  ctx.fillText(`in ${industry}`, 560, 340, 600);
-  if (streak > 0) {
-    ctx.font = '600 34px system-ui, sans-serif';
-    ctx.fillStyle = '#FDBA74';
-    ctx.fillText(`🔥 ${streak}-day learning streak`, 560, 420, 600);
+  ctx.font = 'bold 76px system-ui, sans-serif';
+  ctx.fillText(score.level.label, left, 250, width);
+
+  // Progress bar with a tick at each level
+  const barY = 300, barH = 22;
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.roundRect(left, barY, width, barH, barH / 2);
+  ctx.fill();
+  if (score.pct > 0) {
+    ctx.fillStyle = '#FBBF24';
+    ctx.beginPath();
+    ctx.roundRect(left, barY, Math.max(barH, (width * score.pct) / 100), barH, barH / 2);
+    ctx.fill();
   }
-  ctx.font = '500 28px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  for (const level of LEVELS.filter((l) => l.min > 0 && l.min < 100)) {
+    ctx.fillRect(left + (width * level.min) / 100 - 2, barY - 8, 4, barH + 16);
+  }
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '500 38px system-ui, sans-serif';
+  const streakText = streak > 0 ? ` · ${streak}-day streak` : '';
+  ctx.fillText(`${score.correct}/${score.total} topics mastered${streakText}`, left, 400, width);
+
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  ctx.fillText(`Practise with me at ${SITE}`, 560, 520, 600);
+  ctx.font = '500 28px system-ui, sans-serif';
+  ctx.fillText(`Practised on ${SITE}`, left, 530, width);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
 /** Resolves with 'shared', 'downloaded' or 'cancelled'. */
-export async function shareReadinessBadge(details) {
+export async function sharePrepBadge(details) {
   const blob = await drawBadge(details);
-  const file = new File([blob], 'cxentric-readiness.png', { type: 'image/png' });
-  const text = `I'm ${details.percent}% job-ready for ${details.role} in ${details.industry} on CXentric. Practise with me at https://${SITE}`;
+  const file = new File([blob], 'cxentric-prep.png', { type: 'image/png' });
+  const { score, role, industry } = details;
+  const text = `My ${role} prep track (${industry}) on CXentric: ${score.level.label}, ${score.correct}/${score.total} topics mastered. Practise at https://www.${SITE}`;
 
   if (navigator.canShare?.({ files: [file] })) {
     try {

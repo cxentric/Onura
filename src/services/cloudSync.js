@@ -29,6 +29,24 @@ export function mergeProgress(local, remote) {
     streak: { ...streak, best: Math.max(local.streak.best, remote.streak.best) },
     daily,
     xp: Math.max(local.xp, remote.xp),
+    interviews: mergeInterviews(local.interviews, remote.interviews),
+    interviewPrompt: mergePrompt(local.interviewPrompt, remote.interviewPrompt),
+  };
+}
+
+/** Interview entries from both devices, each once, newest first. */
+function mergeInterviews(local = [], remote = []) {
+  const byId = new Map([...remote, ...local].map((entry) => [entry.id, entry]));
+  return [...byId.values()].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+}
+
+/** A nudge shown or turned off on either device counts on both. */
+function mergePrompt(local, remote) {
+  if (!remote) return local;
+  return {
+    shown: { ...remote.shown, ...local.shown },
+    lastShown: (local.lastShown || '') > (remote.lastShown || '') ? local.lastShown : remote.lastShown,
+    off: local.off || remote.off,
   };
 }
 
