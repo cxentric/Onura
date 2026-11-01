@@ -178,6 +178,11 @@ are in [`src/config/plans.js`](src/config/plans.js) and [`supabase/schema.sql`](
 the daily challenge, streaks and one quiz or revision run a day. Pro (₹149/month or ₹999/year by default, as UPI
 Autopay or a one-time pass): unlimited practice, AI Coach, progress sync and the shareable Prep badge.
 
+The super admin (the founder) always has Pro and every feature, with no end date (`public.has_pro()` in the
+database, `isPro()` in the app). The plan new members start on is the `signup_plan` setting (Free or Pro) with
+`signup_pro_days` (0 = no end date). On a member's page in the admin console, **Switch plan to** moves them to Free,
+Pro for a number of days, or Pro with no end date; every change is in the audit log.
+
 A new price applies straight away to one-time passes. Razorpay Autopay plans have a fixed amount, so for Autopay
 create new plans in Razorpay at the new price and put their ids in the `razorpay_plan_monthly` /
 `razorpay_plan_yearly` settings. Existing Autopay members stay on their old plan.

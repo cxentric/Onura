@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Icon from '../AppIcon';
-import { plansFrom, proFeatures } from '../../config/plans';
+import { hasNoEndDate, plansFrom, proFeatures } from '../../config/plans';
 import { useSettings } from '../../services/appSettings';
 import { isPro, signInWithEmail, signInWithGoogle, signOut, useAuth } from '../../services/auth';
 import { cancelAutopay, upgrade } from '../../services/payments';
@@ -185,6 +185,8 @@ const AccountPanel = () => {
   }
 
   const pro = isPro(auth);
+  const founder = auth.role === 'super_admin';
+  const lifetime = founder || hasNoEndDate(auth.proUntil);
   const sub = auth.subscription;
   const autopayOn = sub && AUTOPAY_ON.has(sub.status);
 
@@ -208,7 +210,7 @@ const AccountPanel = () => {
         <div className="flex-1 min-w-0">
           <p className={`text-xs truncate ${s.muted}`}>{auth.user.email}</p>
           <p className={`text-sm font-semibold ${s.text}`}>
-            {pro ? `Pro until ${formatDate(auth.proUntil)}` : 'Free plan'}
+            {founder ? 'Pro · founder, every feature' : lifetime ? 'Pro · no end date' : pro ? `Pro until ${formatDate(auth.proUntil)}` : 'Free plan'}
           </p>
           {autopayOn && (
             <p className={`text-[11px] ${s.muted}`}>
@@ -232,7 +234,7 @@ const AccountPanel = () => {
       )}
       {error && <p className="text-xs text-error">{error}</p>}
 
-      {!autopayOn && (
+      {!autopayOn && !lifetime && (
         <div>
           <h3 className={`text-sm font-semibold mb-2 ${s.text}`}>{pro ? 'Extend Pro' : 'Upgrade to Pro'}</h3>
           <Plans s={s} />

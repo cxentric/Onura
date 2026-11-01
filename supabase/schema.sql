@@ -17,6 +17,19 @@ create policy "Users can read their own profile"
   using (auth.uid() = id);
 -- No insert/update policies: only the server (service role) can change the plan.
 
+-- Whether an account has Pro now: a paid or given plan, or the super admin (the founder always has every feature).
+-- plpgsql so it can refer to public.admins, created further down.
+create or replace function public.has_pro(p_user_id uuid)
+returns boolean
+language plpgsql stable
+security definer set search_path = ''
+as $$
+begin
+  return exists (select 1 from public.profiles where id = p_user_id and pro_until > now())
+      or exists (select 1 from public.admins where user_id = p_user_id and role = 'super_admin');
+end;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -25,8 +38,21 @@ as $$
 declare
   v_founder uuid;
   v_avatar text := new.raw_user_meta_data ->> 'avatar_url';
+  v_plan text;
+  v_days integer;
 begin
-  insert into public.profiles (id) values (new.id) on conflict (id) do nothing;
+  -- The plan new members start on is chosen in the admin console (Prices and billing).
+  -- Pro with 0 days means Pro with no end date. Anything else starts on Free.
+  select value #>> '{}' into v_plan from public.app_settings where key = 'signup_plan';
+  select least(greatest(coalesce(floor((value #>> '{}')::numeric)::integer, 0), 0), 36500) into v_days from public.app_settings where key = 'signup_pro_days';
+  insert into public.profiles (id, pro_until)
+  values (
+    new.id,
+    case when v_plan = 'pro' then
+      case when coalesce(v_days, 0) = 0 then timestamptz '9999-12-31 23:59:59+00' else now() + make_interval(days => v_days) end
+    end
+  )
+  on conflict (id) do nothing;
 
   -- Public card used for connections: name and picture from Google, or the start of the email.
   insert into public.member_profiles (id, display_name, avatar_url)
@@ -151,14 +177,8 @@ drop policy if exists "Users manage their own progress" on public.progress;
 drop policy if exists "Pro users manage their own progress" on public.progress;
 create policy "Pro users manage their own progress"
   on public.progress for all
-  using (
-    auth.uid() = user_id
-    and exists (select 1 from public.profiles p where p.id = auth.uid() and p.pro_until > now())
-  )
-  with check (
-    auth.uid() = user_id
-    and exists (select 1 from public.profiles p where p.id = auth.uid() and p.pro_until > now())
-  );
+  using (auth.uid() = user_id and public.has_pro(auth.uid()))
+  with check (auth.uid() = user_id and public.has_pro(auth.uid()));
 
 -- =====================================================================================
 -- 5. Member profiles: the public card other members see (name, headline, picture).
@@ -348,6 +368,8 @@ insert into public.app_settings (key, value, type, category, description, is_pub
   ('price_yearly_paise', '99900', 'number', 'billing', 'Yearly Pro price in paise. For Autopay, also create a matching Razorpay plan.', true),
   ('razorpay_plan_monthly', '""', 'text', 'billing', 'Razorpay plan id (plan_…) used for monthly Autopay. Must charge the monthly price.', false),
   ('razorpay_plan_yearly', '""', 'text', 'billing', 'Razorpay plan id (plan_…) used for yearly Autopay. Must charge the yearly price.', false),
+  ('signup_plan', '"free"', 'text', 'billing', 'Plan new members start on: free or pro.', false),
+  ('signup_pro_days', '0', 'number', 'billing', 'When new members start on Pro: how many days it lasts. 0 = no end date.', false),
   ('free_runs_per_day', '1', 'number', 'limits', 'Quiz or revision runs a Free user can start each day. The daily challenge is always free.', true),
   ('ai_coach_pro_only', 'false', 'boolean', 'limits', 'AI Coach is for Pro users only. When off, everyone can connect their own AI key.', true),
   ('openrouter_pro_only', 'true', 'boolean', 'limits', 'Connecting the AI Coach with OpenRouter (one sign-in, every model) is for Pro users only.', true),

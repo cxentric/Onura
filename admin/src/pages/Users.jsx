@@ -2,17 +2,84 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { industryById, roleById } from '../../../src/data/kb';
 import { ROLE_LABELS, can, date, dateTime, rpc, rupees, serverAction } from '../lib';
 import { Badge, Button, Card, ErrorText, Field, inputClass, useReason } from '../ui';
+import { NO_END_DATE, hasNoEndDate } from '../../../src/config/plans';
 
 const PAGE = 50;
 const AUTOPAY_ON = new Set(['authenticated', 'active', 'pending']);
 
-const planBadge = (user) =>
-  user.proUntil && new Date(user.proUntil) > new Date() ? <Badge tone="green">Pro to {date(user.proUntil)}</Badge> : <Badge>Free</Badge>;
+const activePro = (user) => Boolean(user.proUntil) && new Date(user.proUntil) > new Date();
+
+/** The member's plan in words. The super admin always has Pro, whatever the date says. */
+const planText = (user) => {
+  if (user.adminRole === 'super_admin') return 'Pro · founder (every feature, always)';
+  if (!activePro(user)) return 'Free';
+  return hasNoEndDate(user.proUntil) ? 'Pro · no end date' : `Pro until ${date(user.proUntil)}`;
+};
+
+const planBadge = (user) => {
+  if (user.adminRole === 'super_admin') return <Badge tone="purple">Pro · founder</Badge>;
+  if (!activePro(user)) return <Badge>Free</Badge>;
+  return <Badge tone="green">{hasNoEndDate(user.proUntil) ? 'Pro · no end date' : `Pro to ${date(user.proUntil)}`}</Badge>;
+};
+
+const PLAN_CHOICES = [
+  { id: 'free', label: 'Free' },
+  { id: 'pro_days', label: 'Pro for a number of days' },
+  { id: 'pro_forever', label: 'Pro with no end date' },
+];
+
+/** Switches a member to Free, Pro for N days (from today) or Pro with no end date. */
+const PlanSwitcher = ({ user, busy, run, hasAutopay }) => {
+  const [choice, setChoice] = useState(activePro(user) ? (hasNoEndDate(user.proUntil) ? 'pro_forever' : 'pro_days') : 'free');
+  const [days, setDays] = useState(30);
+  const name = user.name || user.email;
+
+  const apply = () => {
+    if (choice === 'free') {
+      return run(`Switch ${name} to Free?`, (reason) => rpc('admin_set_pro_until', { p_user_id: user.id, p_until: new Date().toISOString(), p_reason: reason }), {
+        detail: hasAutopay
+          ? 'Pro ends now. Their Autopay is still on, so the next payment would give Pro again. Cancel Autopay too if they shouldn’t be charged.'
+          : 'Pro ends now. Their progress stays on their devices; cloud sync stops.',
+        danger: true,
+        confirmLabel: 'Switch to Free',
+      });
+    }
+    if (choice === 'pro_forever') {
+      return run(`Give ${name} Pro with no end date?`, (reason) => rpc('admin_set_pro_until', { p_user_id: user.id, p_until: NO_END_DATE, p_reason: reason }), {
+        confirmLabel: 'Give Pro',
+      });
+    }
+    return run(`Give ${name} Pro for ${days} days?`, (reason) =>
+      rpc('admin_set_pro_until', { p_user_id: user.id, p_until: new Date(Date.now() + days * 86400000).toISOString(), p_reason: reason }), {
+      detail: `Pro will end on ${date(new Date(Date.now() + days * 86400000).toISOString())}. This replaces their current end date.`,
+      confirmLabel: 'Give Pro',
+    });
+  };
+
+  return (
+    <div className="flex flex-wrap items-end gap-2">
+      <Field label="Switch plan to">
+        <select value={choice} onChange={(e) => setChoice(e.target.value)} className={`${inputClass} w-60`}>
+          {PLAN_CHOICES.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+      </Field>
+      {choice === 'pro_days' && (
+        <Field label="Days, from today">
+          <input type="number" min={1} max={3650} value={days} onChange={(e) => setDays(Number(e.target.value))} className={`${inputClass} w-28`} />
+        </Field>
+      )}
+      <Button disabled={busy || (choice === 'pro_days' && !(days >= 1 && days <= 3650))} onClick={apply}>
+        Switch plan
+      </Button>
+    </div>
+  );
+};
 
 const UserDetail = ({ userId, role, me, onChanged, onClose }) => {
   const askReason = useReason();
   const [user, setUser] = useState(null);
-  const [days, setDays] = useState(30);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const manage = can(role, 'manageUsers');
@@ -40,7 +107,6 @@ const UserDetail = ({ userId, role, me, onChanged, onClose }) => {
 
   if (!user) return <Card title="Member">{error ? <ErrorText error={error} /> : <p className="text-slate-500">Loading…</p>}</Card>;
 
-  const isPro = user.proUntil && new Date(user.proUntil) > new Date();
   const goal = user.progress?.goal;
   const activeSub = user.subscriptions.find((s) => AUTOPAY_ON.has(s.status));
 
@@ -51,7 +117,7 @@ const UserDetail = ({ userId, role, me, onChanged, onClose }) => {
           <dt className="text-slate-500">Email</dt><dd className="break-all">{user.email}</dd>
           <dt className="text-slate-500">Signed up</dt><dd>{dateTime(user.createdAt)} {user.provider && `(${user.provider})`}</dd>
           <dt className="text-slate-500">Last sign-in</dt><dd>{dateTime(user.lastSignInAt)}</dd>
-          <dt className="text-slate-500">Plan</dt><dd>{isPro ? `Pro until ${date(user.proUntil)}` : 'Free'}</dd>
+          <dt className="text-slate-500">Plan</dt><dd>{planText(user)}</dd>
           <dt className="text-slate-500">Status</dt><dd>{user.blocked ? <Badge tone="red">Blocked</Badge> : <Badge tone="green">Active</Badge>}</dd>
           <dt className="text-slate-500">Connections</dt><dd>{user.connections}</dd>
           {user.adminRole && (<><dt className="text-slate-500">Admin role</dt><dd>{ROLE_LABELS[user.adminRole]}</dd></>)}
@@ -90,26 +156,12 @@ const UserDetail = ({ userId, role, me, onChanged, onClose }) => {
         {manage && (
           <div className="border-t border-slate-100 pt-4 space-y-3">
             <h3 className="font-medium text-slate-800">Actions</h3>
+            {user.adminRole === 'super_admin' ? (
+              <p className="text-slate-500">The founder always has Pro and every feature; their plan can’t be changed.</p>
+            ) : (
+              <PlanSwitcher key={user.proUntil || 'free'} user={user} busy={busy} run={run} hasAutopay={Boolean(activeSub)} />
+            )}
             <div className="flex flex-wrap items-end gap-2">
-              <Field label="Give Pro (days)">
-                <input type="number" min={1} max={3650} value={days} onChange={(e) => setDays(Number(e.target.value))} className={`${inputClass} w-28`} />
-              </Field>
-              <Button
-                disabled={busy || !(days > 0)}
-                onClick={() =>
-                  run(`Give ${user.name || user.email} ${days} days of Pro?`, (reason) => {
-                    const from = isPro ? new Date(user.proUntil) : new Date();
-                    return rpc('admin_set_pro_until', { p_user_id: user.id, p_until: new Date(from.getTime() + days * 86400000).toISOString(), p_reason: reason });
-                  }, { confirmLabel: 'Give Pro' })
-                }
-              >
-                Give Pro
-              </Button>
-              {isPro && (
-                <Button variant="secondary" disabled={busy} onClick={() => run('End Pro now?', (reason) => rpc('admin_set_pro_until', { p_user_id: user.id, p_until: new Date().toISOString(), p_reason: reason }), { danger: true, confirmLabel: 'End Pro' })}>
-                  End Pro now
-                </Button>
-              )}
               {activeSub && (
                 <Button
                   variant="secondary"

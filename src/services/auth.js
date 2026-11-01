@@ -33,7 +33,9 @@ export const useAuth = () => useSyncExternalStore(subscribeAuth, () => state);
 export const getAuth = () => state;
 
 /** Pro is unlocked when accounts are switched off, or the plan runs past now. */
-export const isPro = (s = state) => s.status === 'disabled' || (s.proUntil ? new Date(s.proUntil) > new Date() : false);
+// The super admin (the founder) always has every Pro feature, matching public.has_pro() in the database.
+export const isPro = (s = state) =>
+  s.status === 'disabled' || s.role === 'super_admin' || (s.proUntil ? new Date(s.proUntil) > new Date() : false);
 
 let clientPromise = null;
 export function getSupabase() {

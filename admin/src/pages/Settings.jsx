@@ -11,6 +11,14 @@ const CATEGORY_LABELS = {
   general: 'Other settings',
 };
 
+// Text settings with a fixed set of values get a dropdown instead of a text box.
+const CHOICES = {
+  signup_plan: [
+    { value: 'free', label: 'Free' },
+    { value: 'pro', label: 'Pro' },
+  ],
+};
+
 const toText = (type, value) => (type === 'json' ? JSON.stringify(value, null, 2) : type === 'boolean' ? value : String(value ?? ''));
 function parse(type, text) {
   if (type === 'boolean') return Boolean(text);
@@ -23,7 +31,17 @@ function parse(type, text) {
   return text;
 }
 
-const ValueInput = ({ type, value, onChange, disabled }) => {
+const ValueInput = ({ type, value, onChange, disabled, choices }) => {
+  if (choices) {
+    return (
+      <select disabled={disabled} className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+        {!choices.some((c) => c.value === value) && <option value={value}>{value || '(not set)'}</option>}
+        {choices.map((c) => (
+          <option key={c.value} value={c.value}>{c.label}</option>
+        ))}
+      </select>
+    );
+  }
   if (type === 'boolean') {
     return (
       <button
@@ -91,7 +109,7 @@ const SettingRow = ({ setting, editable, onSaved }) => {
       <div className="md:col-span-3 space-y-1">
         <div className="flex items-start gap-2">
           <div className="flex-1">
-            <ValueInput type={setting.type} value={draft} onChange={setDraft} disabled={!editable} />
+            <ValueInput type={setting.type} value={draft} onChange={setDraft} disabled={!editable} choices={CHOICES[setting.key]} />
           </div>
           {editable && changed && (
             <>
@@ -101,6 +119,9 @@ const SettingRow = ({ setting, editable, onSaved }) => {
           )}
         </div>
         {setting.key.endsWith('_paise') && <p className="text-xs text-slate-500">= {rupees(setting.type === 'number' ? Number(draft) : 0)}</p>}
+        {setting.key === 'signup_pro_days' && (
+          <p className="text-xs text-slate-500">{Number(draft) > 0 ? `New members on Pro get ${Number(draft)} days.` : 'New members on Pro keep it with no end date.'} Only used when signup_plan is Pro.</p>
+        )}
         <p className="text-xs text-slate-400">Updated {dateTime(setting.updated_at)}</p>
         <ErrorText error={error} />
       </div>

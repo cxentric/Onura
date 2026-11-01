@@ -6,6 +6,10 @@ export const PLANS = {
   yearly: { id: 'yearly', label: '1 year', days: 365, amountPaise: 99900 },
 };
 
+// Pro with no end date (given from the admin console, or to new members) is stored as this far-off date.
+export const NO_END_DATE = '9999-12-31T23:59:59Z';
+export const hasNoEndDate = (proUntil) => Boolean(proUntil) && new Date(proUntil).getUTCFullYear() >= 9999;
+
 export const formatRupees = (paise) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 /** The plans with prices from settings ({ price_monthly_paise, price_yearly_paise }). */
